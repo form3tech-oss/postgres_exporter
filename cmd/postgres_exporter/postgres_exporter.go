@@ -1588,6 +1588,15 @@ func loadSecrets() (map[string]interface{}, error) {
 		log.Warnln("error reading vault secrets from /secret/postgres_exporter", err)
 	}
 
+	secret, err = client.Logical().Read("/secret/postgres_exporter/databases")
+	if err == nil {
+		for key, value := range secret.Data {
+			result[key] = value
+		}
+	} else {
+		log.Warnln("error reading vault secrets from /secret/postgres_exporter/databases", err)
+	}
+
 	return result, nil
 }
 
