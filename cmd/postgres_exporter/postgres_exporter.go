@@ -1653,7 +1653,39 @@ func getDataSources() []string {
 
 		return []string{dsn}
 	}
-	return strings.Split(dsn, ",")
+
+	var secrets map[string]interface{}
+	dsns := strings.Split(dsn, ",")
+	for i := range dsns {
+		pairs := strings.Split(dsn, " ")
+		kv := make(map[string]string, len(pairs))
+		for _, pair := range pairs {
+			splitted := strings.SplitN(pair, "=", 2)
+			kv[splitted[0]] = splitted[1]
+		}
+
+		_, hasUser := kv["user"]
+		_, hasPass := kv["password"]
+
+		if !hasUser || !hasPass {
+			if secrets == nil {
+				var err error
+				secrets, err = loadSecrets()
+				if err != nil {
+					panic(err)
+				}
+			}
+			creds := secrets[kv["host"]].(map[string]string)
+			if !hasUser {
+				dsns[i] = dsns[i] + " user=" + creds["database-username"]
+			}
+			if !hasPass {
+				dsns[i] = dsns[i] + " password=" + creds["database-password"]
+			}
+		}
+	}
+
+	return dsns
 }
 
 func contains(a []string, x string) bool {
