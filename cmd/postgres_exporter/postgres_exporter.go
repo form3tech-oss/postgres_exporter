@@ -1654,6 +1654,7 @@ func getDataSources() []string {
 			}
 
 			dbHost := u.Hostname()
+			log.Infof("dbHost: %s", dbHost)
 			creds := secrets[dbHost].(map[string]interface{})
 
 			if len(user) == 0 {
