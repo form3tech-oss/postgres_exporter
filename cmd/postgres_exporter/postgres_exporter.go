@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"reflect"
 	"regexp"
 	"runtime"
 	"strconv"
@@ -1655,7 +1656,9 @@ func getDataSources() []string {
 
 			dbHost := u.Hostname()
 			log.Infof("dbHost: %s", dbHost)
+			log.Infof("keys: %+v", reflect.ValueOf(secrets).MapKeys())
 			creds := secrets[dbHost].(map[string]interface{})
+			log.Infof("host keys: %+v", reflect.ValueOf(creds).MapKeys())
 
 			if len(user) == 0 {
 				user = creds["database-username"].(string)
