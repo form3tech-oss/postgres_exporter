@@ -1693,12 +1693,12 @@ func getDataSources() []string {
 					panic(err)
 				}
 			}
-			creds := secrets[kv["host"]].(map[string]interface{})
+			creds := secrets[kv["host"]].(map[string]string)
 			if !hasUser {
-				dsns[i] = dsns[i] + " user=" + creds["database-username"].(string)
+				dsns[i] = dsns[i] + " user=" + creds["database-username"]
 			}
 			if !hasPass {
-				dsns[i] = dsns[i] + " password=" + creds["database-password"].(string)
+				dsns[i] = dsns[i] + " password=" + creds["database-password"]
 			}
 		}
 	}
