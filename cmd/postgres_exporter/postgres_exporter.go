@@ -1675,7 +1675,7 @@ func getDataSources() []string {
 	var secrets map[string]interface{}
 	dsns := strings.Split(dsn, ",")
 	for i := range dsns {
-		pairs := strings.Split(dsns[i], " ")
+		pairs := strings.Split(dsn, " ")
 		kv := make(map[string]string, len(pairs))
 		for _, pair := range pairs {
 			splitted := strings.SplitN(pair, "=", 2)
