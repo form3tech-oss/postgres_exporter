@@ -1472,6 +1472,7 @@ func (e *Exporter) scrape(ch chan<- prometheus.Metric) {
 		if err := e.scrapeDSN(ch, dsn); err != nil {
 			errorsCount++
 
+			// FIXME
 			log.Errorf(err.Error())
 
 			if _, ok := err.(*ErrorConnectToServer); ok {
@@ -1611,6 +1612,16 @@ func getDataSources() []string {
 		var pass string
 		var uri string
 
+		if len(os.Getenv("DATA_SOURCE_URI_FILE")) != 0 {
+			fileContents, err := ioutil.ReadFile(os.Getenv("DATA_SOURCE_URI_FILE"))
+			if err != nil {
+				panic(err)
+			}
+			uri = strings.TrimSpace(string(fileContents))
+		} else {
+			uri = os.Getenv("DATA_SOURCE_URI")
+		}
+
 		if len(os.Getenv("DATA_SOURCE_USER_FILE")) != 0 {
 			fileContents, err := ioutil.ReadFile(os.Getenv("DATA_SOURCE_USER_FILE"))
 			if err != nil {
@@ -1637,26 +1648,24 @@ func getDataSources() []string {
 				panic(err)
 			}
 
+			u, err := url.Parse(uri)
+			if err != nil {
+				panic(err)
+			}
+
+			dbHost := u.Hostname()
+			creds := secrets[dbHost].(map[string]interface{})
+
 			if len(user) == 0 {
-				user = secrets["database-username"].(string)
+				user = creds["database-username"].(string)
 			}
 
 			if len(pass) == 0 {
-				pass = secrets["database-password"].(string)
+				pass = creds["database-password"].(string)
 			}
 		}
 
 		ui := url.UserPassword(user, pass).String()
-
-		if len(os.Getenv("DATA_SOURCE_URI_FILE")) != 0 {
-			fileContents, err := ioutil.ReadFile(os.Getenv("DATA_SOURCE_URI_FILE"))
-			if err != nil {
-				panic(err)
-			}
-			uri = strings.TrimSpace(string(fileContents))
-		} else {
-			uri = os.Getenv("DATA_SOURCE_URI")
-		}
 
 		dsn = "postgresql://" + ui + "@" + uri
 
