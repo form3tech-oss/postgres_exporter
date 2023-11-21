@@ -9,7 +9,6 @@ require (
 	github.com/form3tech-oss/go-vault-client/v4 v4.3.0
 	github.com/go-kit/log v0.2.1
 	github.com/lib/pq v1.10.9
-	github.com/prometheus-community/postgres_exporter v0.14.0
 	github.com/prometheus/client_golang v1.16.0
 	github.com/prometheus/client_model v0.4.0
 	github.com/prometheus/common v0.44.0
@@ -29,7 +28,7 @@ require (
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/fatih/color v1.14.1 // indirect
-	github.com/go-jose/go-jose/v3 v3.0.0 // indirect
+	github.com/go-jose/go-jose/v3 v3.0.1 // indirect
 	github.com/go-logfmt/logfmt v0.5.1 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/gopherjs/gopherjs v1.17.2 // indirect
