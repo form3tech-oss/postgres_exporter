@@ -37,11 +37,13 @@ jobs:
         run: echo "${{ needs.calculate-tag.outputs.tag }}" | sed s/v//g > VERSION
       - name: Package
         run: make crossbuild-tarballs
+      - name: print
+        run: ls -lart .tarballs
       - name: Archive artifacts
         uses: actions/upload-artifact@v3
         with:
           name: tarballs
-          path: ./.tarballs/*.tar.gz
+          path: .tarballs/postgres_exporter*
 
   commit-message:
     runs-on: ubuntu-latest
