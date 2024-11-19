@@ -37,13 +37,13 @@ func NewPGStatStatementsSummaryCollector(config collectorConfig) (Collector, err
 
 var (
 	statSTatementsSummaryCallsTotal = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, statStatementsSubsystem, "calls_total"),
+		prometheus.BuildFQName(namespace, statStatementsSummarySubsystem, "calls_total"),
 		"Number of times executed",
 		[]string{"datname"},
 		prometheus.Labels{},
 	)
 	statStatementsSummarySecondsTotal = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, statStatementsSubsystem, "seconds_total"),
+		prometheus.BuildFQName(namespace, statStatementsSummarySubsystem, "seconds_total"),
 		"Total time spent in the statement, in seconds",
 		[]string{"datname"},
 		prometheus.Labels{},
