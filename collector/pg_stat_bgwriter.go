@@ -27,82 +27,82 @@ func init() {
 }
 
 type PGStatBGWriterCollector struct {
-	statBGWriterCheckpointsTimedDesc *prometheus.Desc
-	statBGWriterCheckpointsReqDesc *prometheus.Desc
-	statBGWriterCheckpointsReqTimeDesc *prometheus.Desc
+	statBGWriterCheckpointsTimedDesc    *prometheus.Desc
+	statBGWriterCheckpointsReqDesc      *prometheus.Desc
+	statBGWriterCheckpointsReqTimeDesc  *prometheus.Desc
 	statBGWriterCheckpointsSyncTimeDesc *prometheus.Desc
-	statBGWriterBuffersCheckpointDesc *prometheus.Desc
-	statBGWriterBuffersCleanDesc *prometheus.Desc
-	statBGWriterMaxwrittenCleanDesc *prometheus.Desc
-	statBGWriterBuffersBackendDesc *prometheus.Desc
+	statBGWriterBuffersCheckpointDesc   *prometheus.Desc
+	statBGWriterBuffersCleanDesc        *prometheus.Desc
+	statBGWriterMaxwrittenCleanDesc     *prometheus.Desc
+	statBGWriterBuffersBackendDesc      *prometheus.Desc
 	statBGWriterBuffersBackendFsyncDesc *prometheus.Desc
-	statBGWriterBuffersAllocDesc *prometheus.Desc
-	statBGWriterStatsResetDesc *prometheus.Desc
+	statBGWriterBuffersAllocDesc        *prometheus.Desc
+	statBGWriterStatsResetDesc          *prometheus.Desc
 }
 
 func NewPGStatBGWriterCollector(config collectorConfig) (Collector, error) {
 	return &PGStatBGWriterCollector{
-		statBGWriterCheckpointsTimedDesc : prometheus.NewDesc(
+		statBGWriterCheckpointsTimedDesc: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, bgWriterSubsystem, "checkpoints_timed_total"),
 			"Number of scheduled checkpoints that have been performed",
 			[]string{},
 			config.constantLabels,
 		),
-		statBGWriterCheckpointsReqDesc : prometheus.NewDesc(
+		statBGWriterCheckpointsReqDesc: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, bgWriterSubsystem, "checkpoints_req_total"),
 			"Number of requested checkpoints that have been performed",
 			[]string{},
 			config.constantLabels,
 		),
-		statBGWriterCheckpointsReqTimeDesc : prometheus.NewDesc(
+		statBGWriterCheckpointsReqTimeDesc: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, bgWriterSubsystem, "checkpoint_write_time_total"),
 			"Total amount of time that has been spent in the portion of checkpoint processing where files are written to disk, in milliseconds",
 			[]string{},
 			config.constantLabels,
 		),
-		statBGWriterCheckpointsSyncTimeDesc : prometheus.NewDesc(
+		statBGWriterCheckpointsSyncTimeDesc: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, bgWriterSubsystem, "checkpoint_sync_time_total"),
 			"Total amount of time that has been spent in the portion of checkpoint processing where files are synchronized to disk, in milliseconds",
 			[]string{},
 			config.constantLabels,
 		),
-		statBGWriterBuffersCheckpointDesc : prometheus.NewDesc(
+		statBGWriterBuffersCheckpointDesc: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, bgWriterSubsystem, "buffers_checkpoint_total"),
 			"Number of buffers written during checkpoints",
 			[]string{},
 			config.constantLabels,
 		),
-		statBGWriterBuffersCleanDesc : prometheus.NewDesc(
+		statBGWriterBuffersCleanDesc: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, bgWriterSubsystem, "buffers_clean_total"),
 			"Number of buffers written by the background writer",
 			[]string{},
 			config.constantLabels,
 		),
-		statBGWriterMaxwrittenCleanDesc : prometheus.NewDesc(
+		statBGWriterMaxwrittenCleanDesc: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, bgWriterSubsystem, "maxwritten_clean_total"),
 			"Number of times the background writer stopped a cleaning scan because it had written too many buffers",
 			[]string{},
 			config.constantLabels,
 		),
-		statBGWriterBuffersBackendDesc : prometheus.NewDesc(
+		statBGWriterBuffersBackendDesc: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, bgWriterSubsystem, "buffers_backend_total"),
 			"Number of buffers written directly by a backend",
 			[]string{},
 			config.constantLabels,
 		),
-		statBGWriterBuffersBackendFsyncDesc : prometheus.NewDesc(
+		statBGWriterBuffersBackendFsyncDesc: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, bgWriterSubsystem, "buffers_backend_fsync_total"),
 			"Number of times a backend had to execute its own fsync call (normally the background writer handles those even when the backend does its own write)",
 			[]string{},
 			config.constantLabels,
 		),
-		statBGWriterBuffersAllocDesc : prometheus.NewDesc(
+		statBGWriterBuffersAllocDesc: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, bgWriterSubsystem, "buffers_alloc_total"),
 			"Number of buffers allocated",
 			[]string{},
 			config.constantLabels,
 		),
-		statBGWriterStatsResetDesc : prometheus.NewDesc(
+		statBGWriterStatsResetDesc: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, bgWriterSubsystem, "stats_reset_total"),
 			"Time at which these statistics were last reset",
 			[]string{},
