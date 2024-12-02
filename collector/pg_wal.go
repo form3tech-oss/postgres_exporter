@@ -26,41 +26,43 @@ func init() {
 }
 
 type PGWALCollector struct {
+	pgWALSegments *prometheus.Desc
+	pgWALSize     *prometheus.Desc
 }
 
 func NewPGWALCollector(config collectorConfig) (Collector, error) {
-	return &PGWALCollector{}, nil
+	return &PGWALCollector{
+		pgWALSegments: prometheus.NewDesc(
+			prometheus.BuildFQName(
+				namespace,
+				walSubsystem,
+				"segments",
+			),
+			"Number of WAL segments",
+			[]string{},
+			config.constantLabels,
+		),
+		pgWALSize: prometheus.NewDesc(
+			prometheus.BuildFQName(
+				namespace,
+				walSubsystem,
+				"size_bytes",
+			),
+			"Total size of WAL segments",
+			[]string{},
+			config.constantLabels,
+		),
+	}, nil
 }
 
-var (
-	pgWALSegments = prometheus.NewDesc(
-		prometheus.BuildFQName(
-			namespace,
-			walSubsystem,
-			"segments",
-		),
-		"Number of WAL segments",
-		[]string{}, nil,
-	)
-	pgWALSize = prometheus.NewDesc(
-		prometheus.BuildFQName(
-			namespace,
-			walSubsystem,
-			"size_bytes",
-		),
-		"Total size of WAL segments",
-		[]string{}, nil,
-	)
-
-	pgWALQuery = `
+var pgWALQuery = `
 		SELECT
 			COUNT(*) AS segments,
 			SUM(size) AS size
 		FROM pg_ls_waldir()
 		WHERE name ~ '^[0-9A-F]{24}$'`
-)
 
-func (c PGWALCollector) Update(ctx context.Context, instance *instance, ch chan<- prometheus.Metric) error {
+func (c *PGWALCollector) Update(ctx context.Context, instance *instance, ch chan<- prometheus.Metric) error {
 	db := instance.getDB()
 	row := db.QueryRowContext(ctx,
 		pgWALQuery,
@@ -73,11 +75,11 @@ func (c PGWALCollector) Update(ctx context.Context, instance *instance, ch chan<
 		return err
 	}
 	ch <- prometheus.MustNewConstMetric(
-		pgWALSegments,
+		c.pgWALSegments,
 		prometheus.GaugeValue, float64(segments),
 	)
 	ch <- prometheus.MustNewConstMetric(
-		pgWALSize,
+		c.pgWALSize,
 		prometheus.GaugeValue, float64(size),
 	)
 	return nil

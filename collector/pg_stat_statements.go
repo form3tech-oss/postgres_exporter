@@ -32,45 +32,51 @@ func init() {
 }
 
 type PGStatStatementsCollector struct {
-	log log.Logger
+	log                                  log.Logger
+	statStatementsCallsTotal             *prometheus.Desc
+	statStatementsSecondsTotal           *prometheus.Desc
+	statStatementsRowsTotal              *prometheus.Desc
+	statStatementsBlockReadSecondsTotal  *prometheus.Desc
+	statStatementsBlockWriteSecondsTotal *prometheus.Desc
 }
 
 func NewPGStatStatementsCollector(config collectorConfig) (Collector, error) {
-	return &PGStatStatementsCollector{log: config.logger}, nil
+	return &PGStatStatementsCollector{
+		log: config.logger,
+		statStatementsCallsTotal: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, statStatementsSubsystem, "calls_total"),
+			"Number of times executed",
+			[]string{"user", "datname", "queryid"},
+			config.constantLabels,
+		),
+		statStatementsSecondsTotal: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, statStatementsSubsystem, "seconds_total"),
+			"Total time spent in the statement, in seconds",
+			[]string{"user", "datname", "queryid"},
+			config.constantLabels,
+		),
+		statStatementsRowsTotal: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, statStatementsSubsystem, "rows_total"),
+			"Total number of rows retrieved or affected by the statement",
+			[]string{"user", "datname", "queryid"},
+			config.constantLabels,
+		),
+		statStatementsBlockReadSecondsTotal: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, statStatementsSubsystem, "block_read_seconds_total"),
+			"Total time the statement spent reading blocks, in seconds",
+			[]string{"user", "datname", "queryid"},
+			config.constantLabels,
+		),
+		statStatementsBlockWriteSecondsTotal: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, statStatementsSubsystem, "block_write_seconds_total"),
+			"Total time the statement spent writing blocks, in seconds",
+			[]string{"user", "datname", "queryid"},
+			config.constantLabels,
+		),
+	}, nil
 }
 
 var (
-	statSTatementsCallsTotal = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, statStatementsSubsystem, "calls_total"),
-		"Number of times executed",
-		[]string{"user", "datname", "queryid"},
-		prometheus.Labels{},
-	)
-	statStatementsSecondsTotal = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, statStatementsSubsystem, "seconds_total"),
-		"Total time spent in the statement, in seconds",
-		[]string{"user", "datname", "queryid"},
-		prometheus.Labels{},
-	)
-	statStatementsRowsTotal = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, statStatementsSubsystem, "rows_total"),
-		"Total number of rows retrieved or affected by the statement",
-		[]string{"user", "datname", "queryid"},
-		prometheus.Labels{},
-	)
-	statStatementsBlockReadSecondsTotal = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, statStatementsSubsystem, "block_read_seconds_total"),
-		"Total time the statement spent reading blocks, in seconds",
-		[]string{"user", "datname", "queryid"},
-		prometheus.Labels{},
-	)
-	statStatementsBlockWriteSecondsTotal = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, statStatementsSubsystem, "block_write_seconds_total"),
-		"Total time the statement spent writing blocks, in seconds",
-		[]string{"user", "datname", "queryid"},
-		prometheus.Labels{},
-	)
-
 	pgStatStatementsQuery = `SELECT
 		pg_get_userbyid(userid) as user,
 		pg_database.datname,
@@ -114,7 +120,7 @@ var (
 	LIMIT 100;`
 )
 
-func (PGStatStatementsCollector) Update(ctx context.Context, instance *instance, ch chan<- prometheus.Metric) error {
+func (c *PGStatStatementsCollector) Update(ctx context.Context, instance *instance, ch chan<- prometheus.Metric) error {
 	query := pgStatStatementsQuery
 	if instance.version.GE(semver.MustParse("13.0.0")) {
 		query = pgStatStatementsNewQuery
@@ -154,7 +160,7 @@ func (PGStatStatementsCollector) Update(ctx context.Context, instance *instance,
 			callsTotalMetric = float64(callsTotal.Int64)
 		}
 		ch <- prometheus.MustNewConstMetric(
-			statSTatementsCallsTotal,
+			c.statStatementsCallsTotal,
 			prometheus.CounterValue,
 			callsTotalMetric,
 			userLabel, datnameLabel, queryidLabel,
@@ -165,7 +171,7 @@ func (PGStatStatementsCollector) Update(ctx context.Context, instance *instance,
 			secondsTotalMetric = secondsTotal.Float64
 		}
 		ch <- prometheus.MustNewConstMetric(
-			statStatementsSecondsTotal,
+			c.statStatementsSecondsTotal,
 			prometheus.CounterValue,
 			secondsTotalMetric,
 			userLabel, datnameLabel, queryidLabel,
@@ -176,7 +182,7 @@ func (PGStatStatementsCollector) Update(ctx context.Context, instance *instance,
 			rowsTotalMetric = float64(rowsTotal.Int64)
 		}
 		ch <- prometheus.MustNewConstMetric(
-			statStatementsRowsTotal,
+			c.statStatementsRowsTotal,
 			prometheus.CounterValue,
 			rowsTotalMetric,
 			userLabel, datnameLabel, queryidLabel,
@@ -187,7 +193,7 @@ func (PGStatStatementsCollector) Update(ctx context.Context, instance *instance,
 			blockReadSecondsTotalMetric = blockReadSecondsTotal.Float64
 		}
 		ch <- prometheus.MustNewConstMetric(
-			statStatementsBlockReadSecondsTotal,
+			c.statStatementsBlockReadSecondsTotal,
 			prometheus.CounterValue,
 			blockReadSecondsTotalMetric,
 			userLabel, datnameLabel, queryidLabel,
@@ -198,7 +204,7 @@ func (PGStatStatementsCollector) Update(ctx context.Context, instance *instance,
 			blockWriteSecondsTotalMetric = blockWriteSecondsTotal.Float64
 		}
 		ch <- prometheus.MustNewConstMetric(
-			statStatementsBlockWriteSecondsTotal,
+			c.statStatementsBlockWriteSecondsTotal,
 			prometheus.CounterValue,
 			blockWriteSecondsTotalMetric,
 			userLabel, datnameLabel, queryidLabel,

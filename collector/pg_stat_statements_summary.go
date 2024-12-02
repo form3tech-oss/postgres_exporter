@@ -28,27 +28,30 @@ func init() {
 }
 
 type PGStatStatementsSummaryCollector struct {
-	log log.Logger
+	log                               log.Logger
+	statStatementsSummaryCallsTotal   *prometheus.Desc
+	statStatementsSummarySecondsTotal *prometheus.Desc
 }
 
 func NewPGStatStatementsSummaryCollector(config collectorConfig) (Collector, error) {
-	return &PGStatStatementsSummaryCollector{log: config.logger}, nil
+	return &PGStatStatementsSummaryCollector{
+		log: config.logger,
+		statStatementsSummaryCallsTotal: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, statStatementsSummarySubsystem, "calls_total"),
+			"Number of times executed",
+			[]string{"datname"},
+			config.constantLabels,
+		),
+		statStatementsSummarySecondsTotal: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, statStatementsSummarySubsystem, "seconds_total"),
+			"Total time spent in the statement, in seconds",
+			[]string{"datname"},
+			config.constantLabels,
+		),
+	}, nil
 }
 
 var (
-	statSTatementsSummaryCallsTotal = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, statStatementsSummarySubsystem, "calls_total"),
-		"Number of times executed",
-		[]string{"datname"},
-		prometheus.Labels{},
-	)
-	statStatementsSummarySecondsTotal = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, statStatementsSummarySubsystem, "seconds_total"),
-		"Total time spent in the statement, in seconds",
-		[]string{"datname"},
-		prometheus.Labels{},
-	)
-
 	pgStatStatementsSummaryQuery = `SELECT
   	pg_database.datname,
   	SUM(pg_stat_statements.calls) as calls_total,
@@ -65,7 +68,7 @@ var (
   GROUP BY pg_database.datname;`
 )
 
-func (PGStatStatementsSummaryCollector) Update(ctx context.Context, instance *instance, ch chan<- prometheus.Metric) error {
+func (c *PGStatStatementsSummaryCollector) Update(ctx context.Context, instance *instance, ch chan<- prometheus.Metric) error {
 	query := pgStatStatementsSummaryQuery
 
 	db := instance.getDB()
@@ -94,7 +97,7 @@ func (PGStatStatementsSummaryCollector) Update(ctx context.Context, instance *in
 			callsTotalMetric = float64(callsTotal.Int64)
 		}
 		ch <- prometheus.MustNewConstMetric(
-			statSTatementsSummaryCallsTotal,
+			c.statStatementsSummaryCallsTotal,
 			prometheus.CounterValue,
 			callsTotalMetric,
 			datnameLabel,
@@ -105,7 +108,7 @@ func (PGStatStatementsSummaryCollector) Update(ctx context.Context, instance *in
 			secondsTotalMetric = secondsTotal.Float64
 		}
 		ch <- prometheus.MustNewConstMetric(
-			statStatementsSummarySecondsTotal,
+			c.statStatementsSummarySecondsTotal,
 			prometheus.CounterValue,
 			secondsTotalMetric,
 			datnameLabel,

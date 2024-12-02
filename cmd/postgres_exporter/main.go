@@ -16,8 +16,8 @@ package main
 import (
 	"errors"
 	"fmt"
-	"net/http"
 	"net"
+	"net/http"
 	"os"
 	"strings"
 
@@ -137,29 +137,38 @@ func main() {
 		exporter.servers.Close()
 	}()
 
-	prometheus.MustRegister(version.NewCollector(exporterName))
+	reg := prometheus.NewRegistry()
 
-	prometheus.MustRegister(exporter)
+	reg.MustRegister(
+		version.NewCollector(exporterName),
+		exporter,
+	)
 
 	// TODO(@sysadmind): Remove this with multi-target support. We are removing multiple DSN support
 	dsn := ""
 	if len(dsns) > 0 {
 		dsn = dsns[0]
 	}
+	
+	collOpts := []collector.Option{
+		collector.WithConstantLabels(parseConstLabels(*constantLabelsList)),
+	}
 
-	pe, err := collector.NewPostgresCollector(
+	pgColl, err := collector.NewPostgresCollector(
 		logger,
 		excludedDatabases,
 		dsn,
 		[]string{},
+		collOpts...
 	)
 	if err != nil {
 		level.Warn(logger).Log("msg", "Failed to create PostgresCollector", "err", err.Error())
 	} else {
-		prometheus.MustRegister(pe)
+		
+		reg.MustRegister(pgColl)
 	}
 
-	http.Handle(*metricsPath, promhttp.Handler())
+	http.Handle(*metricsPath, promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
 
 	if *metricsPath != "/" && *metricsPath != "" {
 		landingConfig := web.LandingConfig{

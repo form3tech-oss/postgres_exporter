@@ -28,64 +28,72 @@ func init() {
 }
 
 type PGStatIOUserTablesCollector struct {
-	log log.Logger
+	log                           log.Logger
+	statioUserTablesHeapBlksRead  *prometheus.Desc
+	statioUserTablesHeapBlksHit   *prometheus.Desc
+	statioUserTablesIdxBlksRead   *prometheus.Desc
+	statioUserTablesIdxBlksHit    *prometheus.Desc
+	statioUserTablesToastBlksRead *prometheus.Desc
+	statioUserTablesToastBlksHit  *prometheus.Desc
+	statioUserTablesTidxBlksRead  *prometheus.Desc
+	statioUserTablesTidxBlksHit   *prometheus.Desc
 }
 
 func NewPGStatIOUserTablesCollector(config collectorConfig) (Collector, error) {
-	return &PGStatIOUserTablesCollector{log: config.logger}, nil
+	return &PGStatIOUserTablesCollector{
+		log: config.logger,
+		statioUserTablesHeapBlksRead: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, statioUserTableSubsystem, "heap_blocks_read"),
+			"Number of disk blocks read from this table",
+			[]string{"datname", "schemaname", "relname"},
+			config.constantLabels,
+		),
+		statioUserTablesHeapBlksHit: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, statioUserTableSubsystem, "heap_blocks_hit"),
+			"Number of buffer hits in this table",
+			[]string{"datname", "schemaname", "relname"},
+			config.constantLabels,
+		),
+		statioUserTablesIdxBlksRead: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, statioUserTableSubsystem, "idx_blocks_read"),
+			"Number of disk blocks read from all indexes on this table",
+			[]string{"datname", "schemaname", "relname"},
+			config.constantLabels,
+		),
+		statioUserTablesIdxBlksHit: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, statioUserTableSubsystem, "idx_blocks_hit"),
+			"Number of buffer hits in all indexes on this table",
+			[]string{"datname", "schemaname", "relname"},
+			config.constantLabels,
+		),
+		statioUserTablesToastBlksRead: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, statioUserTableSubsystem, "toast_blocks_read"),
+			"Number of disk blocks read from this table's TOAST table (if any)",
+			[]string{"datname", "schemaname", "relname"},
+			config.constantLabels,
+		),
+		statioUserTablesToastBlksHit: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, statioUserTableSubsystem, "toast_blocks_hit"),
+			"Number of buffer hits in this table's TOAST table (if any)",
+			[]string{"datname", "schemaname", "relname"},
+			config.constantLabels,
+		),
+		statioUserTablesTidxBlksRead: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, statioUserTableSubsystem, "tidx_blocks_read"),
+			"Number of disk blocks read from this table's TOAST table indexes (if any)",
+			[]string{"datname", "schemaname", "relname"},
+			config.constantLabels,
+		),
+		statioUserTablesTidxBlksHit: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, statioUserTableSubsystem, "tidx_blocks_hit"),
+			"Number of buffer hits in this table's TOAST table indexes (if any)",
+			[]string{"datname", "schemaname", "relname"},
+			config.constantLabels,
+		),
+	}, nil
 }
 
-var (
-	statioUserTablesHeapBlksRead = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, statioUserTableSubsystem, "heap_blocks_read"),
-		"Number of disk blocks read from this table",
-		[]string{"datname", "schemaname", "relname"},
-		prometheus.Labels{},
-	)
-	statioUserTablesHeapBlksHit = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, statioUserTableSubsystem, "heap_blocks_hit"),
-		"Number of buffer hits in this table",
-		[]string{"datname", "schemaname", "relname"},
-		prometheus.Labels{},
-	)
-	statioUserTablesIdxBlksRead = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, statioUserTableSubsystem, "idx_blocks_read"),
-		"Number of disk blocks read from all indexes on this table",
-		[]string{"datname", "schemaname", "relname"},
-		prometheus.Labels{},
-	)
-	statioUserTablesIdxBlksHit = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, statioUserTableSubsystem, "idx_blocks_hit"),
-		"Number of buffer hits in all indexes on this table",
-		[]string{"datname", "schemaname", "relname"},
-		prometheus.Labels{},
-	)
-	statioUserTablesToastBlksRead = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, statioUserTableSubsystem, "toast_blocks_read"),
-		"Number of disk blocks read from this table's TOAST table (if any)",
-		[]string{"datname", "schemaname", "relname"},
-		prometheus.Labels{},
-	)
-	statioUserTablesToastBlksHit = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, statioUserTableSubsystem, "toast_blocks_hit"),
-		"Number of buffer hits in this table's TOAST table (if any)",
-		[]string{"datname", "schemaname", "relname"},
-		prometheus.Labels{},
-	)
-	statioUserTablesTidxBlksRead = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, statioUserTableSubsystem, "tidx_blocks_read"),
-		"Number of disk blocks read from this table's TOAST table indexes (if any)",
-		[]string{"datname", "schemaname", "relname"},
-		prometheus.Labels{},
-	)
-	statioUserTablesTidxBlksHit = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, statioUserTableSubsystem, "tidx_blocks_hit"),
-		"Number of buffer hits in this table's TOAST table indexes (if any)",
-		[]string{"datname", "schemaname", "relname"},
-		prometheus.Labels{},
-	)
-
-	statioUserTablesQuery = `SELECT
+var statioUserTablesQuery = `SELECT
 		current_database() datname,
 		schemaname,
 		relname,
@@ -98,9 +106,8 @@ var (
 		tidx_blks_read,
 		tidx_blks_hit
 	FROM pg_statio_user_tables`
-)
 
-func (PGStatIOUserTablesCollector) Update(ctx context.Context, instance *instance, ch chan<- prometheus.Metric) error {
+func (c *PGStatIOUserTablesCollector) Update(ctx context.Context, instance *instance, ch chan<- prometheus.Metric) error {
 	db := instance.getDB()
 	rows, err := db.QueryContext(ctx,
 		statioUserTablesQuery)
@@ -135,7 +142,7 @@ func (PGStatIOUserTablesCollector) Update(ctx context.Context, instance *instanc
 			heapBlksReadMetric = float64(heapBlksRead.Int64)
 		}
 		ch <- prometheus.MustNewConstMetric(
-			statioUserTablesHeapBlksRead,
+			c.statioUserTablesHeapBlksRead,
 			prometheus.CounterValue,
 			heapBlksReadMetric,
 			datnameLabel, schemanameLabel, relnameLabel,
@@ -146,7 +153,7 @@ func (PGStatIOUserTablesCollector) Update(ctx context.Context, instance *instanc
 			heapBlksHitMetric = float64(heapBlksHit.Int64)
 		}
 		ch <- prometheus.MustNewConstMetric(
-			statioUserTablesHeapBlksHit,
+			c.statioUserTablesHeapBlksHit,
 			prometheus.CounterValue,
 			heapBlksHitMetric,
 			datnameLabel, schemanameLabel, relnameLabel,
@@ -157,7 +164,7 @@ func (PGStatIOUserTablesCollector) Update(ctx context.Context, instance *instanc
 			idxBlksReadMetric = float64(idxBlksRead.Int64)
 		}
 		ch <- prometheus.MustNewConstMetric(
-			statioUserTablesIdxBlksRead,
+			c.statioUserTablesIdxBlksRead,
 			prometheus.CounterValue,
 			idxBlksReadMetric,
 			datnameLabel, schemanameLabel, relnameLabel,
@@ -168,7 +175,7 @@ func (PGStatIOUserTablesCollector) Update(ctx context.Context, instance *instanc
 			idxBlksHitMetric = float64(idxBlksHit.Int64)
 		}
 		ch <- prometheus.MustNewConstMetric(
-			statioUserTablesIdxBlksHit,
+			c.statioUserTablesIdxBlksHit,
 			prometheus.CounterValue,
 			idxBlksHitMetric,
 			datnameLabel, schemanameLabel, relnameLabel,
@@ -179,7 +186,7 @@ func (PGStatIOUserTablesCollector) Update(ctx context.Context, instance *instanc
 			toastBlksReadMetric = float64(toastBlksRead.Int64)
 		}
 		ch <- prometheus.MustNewConstMetric(
-			statioUserTablesToastBlksRead,
+			c.statioUserTablesToastBlksRead,
 			prometheus.CounterValue,
 			toastBlksReadMetric,
 			datnameLabel, schemanameLabel, relnameLabel,
@@ -190,7 +197,7 @@ func (PGStatIOUserTablesCollector) Update(ctx context.Context, instance *instanc
 			toastBlksHitMetric = float64(toastBlksHit.Int64)
 		}
 		ch <- prometheus.MustNewConstMetric(
-			statioUserTablesToastBlksHit,
+			c.statioUserTablesToastBlksHit,
 			prometheus.CounterValue,
 			toastBlksHitMetric,
 			datnameLabel, schemanameLabel, relnameLabel,
@@ -201,7 +208,7 @@ func (PGStatIOUserTablesCollector) Update(ctx context.Context, instance *instanc
 			tidxBlksReadMetric = float64(tidxBlksRead.Int64)
 		}
 		ch <- prometheus.MustNewConstMetric(
-			statioUserTablesTidxBlksRead,
+			c.statioUserTablesTidxBlksRead,
 			prometheus.CounterValue,
 			tidxBlksReadMetric,
 			datnameLabel, schemanameLabel, relnameLabel,
@@ -212,7 +219,7 @@ func (PGStatIOUserTablesCollector) Update(ctx context.Context, instance *instanc
 			tidxBlksHitMetric = float64(tidxBlksHit.Int64)
 		}
 		ch <- prometheus.MustNewConstMetric(
-			statioUserTablesTidxBlksHit,
+			c.statioUserTablesTidxBlksHit,
 			prometheus.CounterValue,
 			tidxBlksHitMetric,
 			datnameLabel, schemanameLabel, relnameLabel,

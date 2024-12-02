@@ -28,51 +28,59 @@ func init() {
 }
 
 type PGReplicationSlotCollector struct {
-	log log.Logger
+	log                               log.Logger
+	pgReplicationSlotCurrentWalDesc   *prometheus.Desc
+	pgReplicationSlotCurrentFlushDesc *prometheus.Desc
+	pgReplicationSlotIsActiveDesc     *prometheus.Desc
+	pgReplicationSlotWalStatus        *prometheus.Desc
 }
 
 func NewPGReplicationSlotCollector(config collectorConfig) (Collector, error) {
-	return &PGReplicationSlotCollector{log: config.logger}, nil
+	return &PGReplicationSlotCollector{log: config.logger,
+		pgReplicationSlotCurrentWalDesc: prometheus.NewDesc(
+			prometheus.BuildFQName(
+				namespace,
+				replicationSlotSubsystem,
+				"slot_current_wal_lsn",
+			),
+			"current wal lsn value",
+			[]string{"slot_name", "slot_type"},
+			config.constantLabels,
+		),
+		pgReplicationSlotCurrentFlushDesc: prometheus.NewDesc(
+			prometheus.BuildFQName(
+				namespace,
+				replicationSlotSubsystem,
+				"slot_confirmed_flush_lsn",
+			),
+			"last lsn confirmed flushed to the replication slot",
+			[]string{"slot_name", "slot_type"},
+			config.constantLabels,
+		),
+		pgReplicationSlotIsActiveDesc: prometheus.NewDesc(
+			prometheus.BuildFQName(
+				namespace,
+				replicationSlotSubsystem,
+				"slot_is_active",
+			),
+			"whether the replication slot is active or not",
+			[]string{"slot_name", "slot_type"},
+			config.constantLabels,
+		),
+		pgReplicationSlotWalStatus: prometheus.NewDesc(
+			prometheus.BuildFQName(
+				namespace,
+				replicationSlotSubsystem,
+				"wal_status",
+			),
+			"availability of WAL files claimed by this slot",
+			[]string{"slot_name", "slot_type", "wal_status"}, 
+			config.constantLabels,
+		),
+	}, nil
 }
 
 var (
-	pgReplicationSlotCurrentWalDesc = prometheus.NewDesc(
-		prometheus.BuildFQName(
-			namespace,
-			replicationSlotSubsystem,
-			"slot_current_wal_lsn",
-		),
-		"current wal lsn value",
-		[]string{"slot_name", "slot_type"}, nil,
-	)
-	pgReplicationSlotCurrentFlushDesc = prometheus.NewDesc(
-		prometheus.BuildFQName(
-			namespace,
-			replicationSlotSubsystem,
-			"slot_confirmed_flush_lsn",
-		),
-		"last lsn confirmed flushed to the replication slot",
-		[]string{"slot_name", "slot_type"}, nil,
-	)
-	pgReplicationSlotIsActiveDesc = prometheus.NewDesc(
-		prometheus.BuildFQName(
-			namespace,
-			replicationSlotSubsystem,
-			"slot_is_active",
-		),
-		"whether the replication slot is active or not",
-		[]string{"slot_name", "slot_type"}, nil,
-	)
-	pgReplicationSlotWalStatus = prometheus.NewDesc(
-		prometheus.BuildFQName(
-			namespace,
-			replicationSlotSubsystem,
-			"wal_status",
-		),
-		"availability of WAL files claimed by this slot",
-		[]string{"slot_name", "slot_type", "wal_status"}, nil,
-	)
-
 	pgReplicationSlotQuery = `SELECT
 		slot_name,
 		slot_type,
@@ -87,7 +95,7 @@ var (
 	FROM pg_replication_slots;`
 )
 
-func (PGReplicationSlotCollector) Update(ctx context.Context, instance *instance, ch chan<- prometheus.Metric) error {
+func (c *PGReplicationSlotCollector) Update(ctx context.Context, instance *instance, ch chan<- prometheus.Metric) error {
 	db := instance.getDB()
 	rows, err := db.QueryContext(ctx,
 		pgReplicationSlotQuery)
@@ -125,7 +133,7 @@ func (PGReplicationSlotCollector) Update(ctx context.Context, instance *instance
 			walLSNMetric = walLSN.Float64
 		}
 		ch <- prometheus.MustNewConstMetric(
-			pgReplicationSlotCurrentWalDesc,
+			c.pgReplicationSlotCurrentWalDesc,
 			prometheus.GaugeValue, walLSNMetric, slotNameLabel, slotTypeLabel,
 		)
 		if isActive.Valid && isActive.Bool {
@@ -134,18 +142,18 @@ func (PGReplicationSlotCollector) Update(ctx context.Context, instance *instance
 				flushLSNMetric = flushLSN.Float64
 			}
 			ch <- prometheus.MustNewConstMetric(
-				pgReplicationSlotCurrentFlushDesc,
+				c.pgReplicationSlotCurrentFlushDesc,
 				prometheus.GaugeValue, flushLSNMetric, slotNameLabel, slotTypeLabel,
 			)
 		}
 		ch <- prometheus.MustNewConstMetric(
-			pgReplicationSlotIsActiveDesc,
+			c.pgReplicationSlotIsActiveDesc,
 			prometheus.GaugeValue, isActiveValue, slotNameLabel, slotTypeLabel,
 		)
 
 		if walStatus.Valid {
 			ch <- prometheus.MustNewConstMetric(
-				pgReplicationSlotWalStatus,
+				c.pgReplicationSlotWalStatus,
 				prometheus.GaugeValue, 1, slotNameLabel, slotTypeLabel, walStatus.String,
 			)
 		}

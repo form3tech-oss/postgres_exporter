@@ -29,27 +29,30 @@ func init() {
 }
 
 type PGDatabaseWraparoundCollector struct {
-	log log.Logger
+	log                               log.Logger
+	databaseWraparoundAgeDatfrozenxid *prometheus.Desc
+	databaseWraparoundAgeDatminmxid   *prometheus.Desc
 }
 
 func NewPGDatabaseWraparoundCollector(config collectorConfig) (Collector, error) {
-	return &PGDatabaseWraparoundCollector{log: config.logger}, nil
+	return &PGDatabaseWraparoundCollector{
+		log: config.logger,
+		databaseWraparoundAgeDatfrozenxid: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, databaseWraparoundSubsystem, "age_datfrozenxid_seconds"),
+			"Age of the oldest transaction ID that has not been frozen.",
+			[]string{"datname"},
+			config.constantLabels,
+		),
+		databaseWraparoundAgeDatminmxid: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, databaseWraparoundSubsystem, "age_datminmxid_seconds"),
+			"Age of the oldest multi-transaction ID that has been replaced with a transaction ID.",
+			[]string{"datname"},
+			config.constantLabels,
+		),
+	}, nil
 }
 
 var (
-	databaseWraparoundAgeDatfrozenxid = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, databaseWraparoundSubsystem, "age_datfrozenxid_seconds"),
-		"Age of the oldest transaction ID that has not been frozen.",
-		[]string{"datname"},
-		prometheus.Labels{},
-	)
-	databaseWraparoundAgeDatminmxid = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, databaseWraparoundSubsystem, "age_datminmxid_seconds"),
-		"Age of the oldest multi-transaction ID that has been replaced with a transaction ID.",
-		[]string{"datname"},
-		prometheus.Labels{},
-	)
-
 	databaseWraparoundQuery = `
 	SELECT
 		datname,
@@ -96,14 +99,14 @@ func (c *PGDatabaseWraparoundCollector) Update(ctx context.Context, instance *in
 		ageDatfrozenxidMetric := ageDatfrozenxid.Float64
 
 		ch <- prometheus.MustNewConstMetric(
-			databaseWraparoundAgeDatfrozenxid,
+			c.databaseWraparoundAgeDatfrozenxid,
 			prometheus.GaugeValue,
 			ageDatfrozenxidMetric, datname.String,
 		)
 
 		ageDatminmxidMetric := ageDatminmxid.Float64
 		ch <- prometheus.MustNewConstMetric(
-			databaseWraparoundAgeDatminmxid,
+			c.databaseWraparoundAgeDatminmxid,
 			prometheus.GaugeValue,
 			ageDatminmxidMetric, datname.String,
 		)

@@ -17,6 +17,7 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/go-kit/log"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/smartystreets/goconvey/convey"
@@ -40,7 +41,10 @@ func TestPGDatabaseCollector(t *testing.T) {
 	ch := make(chan prometheus.Metric)
 	go func() {
 		defer close(ch)
-		c := PGDatabaseCollector{}
+		c, _ := NewPGDatabaseCollector(collectorConfig{
+			logger: log.NewNopLogger(),
+			constantLabels: prometheus.Labels{},
+		})
 		if err := c.Update(context.Background(), inst, ch); err != nil {
 			t.Errorf("Error calling PGDatabaseCollector.Update: %s", err)
 		}
@@ -81,7 +85,10 @@ func TestPGDatabaseCollectorNullMetric(t *testing.T) {
 	ch := make(chan prometheus.Metric)
 	go func() {
 		defer close(ch)
-		c := PGDatabaseCollector{}
+		c, _ := NewPGDatabaseCollector(collectorConfig{
+			logger: log.NewNopLogger(),
+			constantLabels: prometheus.Labels{},
+		})
 		if err := c.Update(context.Background(), inst, ch); err != nil {
 			t.Errorf("Error calling PGDatabaseCollector.Update: %s", err)
 		}
