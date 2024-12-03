@@ -14,7 +14,9 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -46,6 +48,7 @@ var (
 	autoDiscoverDatabases  = kingpin.Flag("auto-discover-databases", "Whether to discover the databases on a server dynamically. (DEPRECATED)").Default("false").Envar("PG_EXPORTER_AUTO_DISCOVER_DATABASES").Bool()
 	queriesPath            = kingpin.Flag("extend.query-path", "Path to custom queries to run. (DEPRECATED)").Default("").Envar("PG_EXPORTER_EXTEND_QUERY_PATH").String()
 	onlyDumpMaps           = kingpin.Flag("dumpmaps", "Do not run, simply dump the maps.").Bool()
+	onlyHealthCheck        = kingpin.Flag("healthcheck", "Do not run, just return if up and running.").Bool()
 	constantLabelsList     = kingpin.Flag("constantLabels", "A list of label=value separated by comma(,). (DEPRECATED)").Default("").Envar("PG_EXPORTER_CONSTANT_LABELS").String()
 	excludeDatabases       = kingpin.Flag("exclude-databases", "A list of databases to remove when autoDiscoverDatabases is enabled (DEPRECATED)").Default("").Envar("PG_EXPORTER_EXCLUDE_DATABASES").String()
 	includeDatabases       = kingpin.Flag("include-databases", "A list of databases to include when autoDiscoverDatabases is enabled (DEPRECATED)").Default("").Envar("PG_EXPORTER_INCLUDE_DATABASES").String()
@@ -79,6 +82,18 @@ func main() {
 	if *onlyDumpMaps {
 		dumpMaps()
 		return
+	}
+
+	if *onlyHealthCheck {
+		healthy, err := runHealthCheck(webConfig)
+		if err != nil {
+			level.Error(logger).Log("msg", "error running health check", "err", err)
+		}
+		if healthy {
+			level.Info(logger).Log("msg", "health ok")
+			os.Exit(0)
+		}
+		os.Exit(1)
 	}
 
 	if err := c.ReloadConfig(*configFile, logger); err != nil {
@@ -122,29 +137,38 @@ func main() {
 		exporter.servers.Close()
 	}()
 
-	prometheus.MustRegister(version.NewCollector(exporterName))
+	reg := prometheus.NewRegistry()
 
-	prometheus.MustRegister(exporter)
+	reg.MustRegister(
+		version.NewCollector(exporterName),
+		exporter,
+	)
 
 	// TODO(@sysadmind): Remove this with multi-target support. We are removing multiple DSN support
 	dsn := ""
 	if len(dsns) > 0 {
 		dsn = dsns[0]
 	}
+	
+	collOpts := []collector.Option{
+		collector.WithConstantLabels(parseConstLabels(*constantLabelsList)),
+	}
 
-	pe, err := collector.NewPostgresCollector(
+	pgColl, err := collector.NewPostgresCollector(
 		logger,
 		excludedDatabases,
 		dsn,
 		[]string{},
+		collOpts...
 	)
 	if err != nil {
 		level.Warn(logger).Log("msg", "Failed to create PostgresCollector", "err", err.Error())
 	} else {
-		prometheus.MustRegister(pe)
+		
+		reg.MustRegister(pgColl)
 	}
 
-	http.Handle(*metricsPath, promhttp.Handler())
+	http.Handle(*metricsPath, promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
 
 	if *metricsPath != "/" && *metricsPath != "" {
 		landingConfig := web.LandingConfig{
@@ -173,4 +197,31 @@ func main() {
 		level.Error(logger).Log("msg", "Error running HTTP server", "err", err)
 		os.Exit(1)
 	}
+}
+
+func runHealthCheck(webConfig *web.FlagConfig) (bool, error) {
+	if len(*webConfig.WebListenAddresses) == 0 {
+		return false, errors.New("no listen addresses to run the request to")
+	}
+	addr := (*webConfig.WebListenAddresses)[0]
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return false, err
+	}
+	if host == "" {
+		host = "localhost"
+	}
+	url := fmt.Sprintf("http://%s:%s/", host, port)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return false, err
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return false, err
+	}
+
+	defer resp.Body.Close()
+	return resp.StatusCode == 200, nil
 }

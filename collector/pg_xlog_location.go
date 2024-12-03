@@ -30,29 +30,29 @@ func init() {
 
 type PGXlogLocationCollector struct {
 	log log.Logger
+	xlogLocationBytes *prometheus.Desc
 }
 
 func NewPGXlogLocationCollector(config collectorConfig) (Collector, error) {
-	return &PGXlogLocationCollector{log: config.logger}, nil
+	return &PGXlogLocationCollector{
+		log: config.logger,
+		xlogLocationBytes: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, xlogLocationSubsystem, "bytes"),
+			"Postgres LSN (log sequence number) being generated on primary or replayed on replica (truncated to low 52 bits)",
+			[]string{},
+			config.constantLabels,
+		),
+	}, nil
 }
 
-var (
-	xlogLocationBytes = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, xlogLocationSubsystem, "bytes"),
-		"Postgres LSN (log sequence number) being generated on primary or replayed on replica (truncated to low 52 bits)",
-		[]string{},
-		prometheus.Labels{},
-	)
-
-	xlogLocationQuery = `
+var xlogLocationQuery = `
 	SELECT CASE
 		WHEN pg_is_in_recovery() THEN (pg_last_xlog_replay_location() - '0/0') % (2^52)::bigint
 		ELSE (pg_current_xlog_location() - '0/0') % (2^52)::bigint
 	END AS bytes
 	`
-)
 
-func (c PGXlogLocationCollector) Update(ctx context.Context, instance *instance, ch chan<- prometheus.Metric) error {
+func (c *PGXlogLocationCollector) Update(ctx context.Context, instance *instance, ch chan<- prometheus.Metric) error {
 	db := instance.getDB()
 
 	// xlog was renmaed to WAL in PostgreSQL 10
@@ -79,7 +79,7 @@ func (c PGXlogLocationCollector) Update(ctx context.Context, instance *instance,
 		}
 
 		ch <- prometheus.MustNewConstMetric(
-			xlogLocationBytes,
+			c.xlogLocationBytes,
 			prometheus.GaugeValue,
 			bytes,
 		)

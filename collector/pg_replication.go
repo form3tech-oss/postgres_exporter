@@ -26,33 +26,36 @@ func init() {
 }
 
 type PGReplicationCollector struct {
+	pgReplicationLag *prometheus.Desc
+	pgReplicationIsReplica *prometheus.Desc
 }
 
-func NewPGReplicationCollector(collectorConfig) (Collector, error) {
-	return &PGReplicationCollector{}, nil
+func NewPGReplicationCollector(config collectorConfig) (Collector, error) {
+	return &PGReplicationCollector{
+		pgReplicationLag : prometheus.NewDesc(
+			prometheus.BuildFQName(
+				namespace,
+				replicationSubsystem,
+				"lag_seconds",
+			),
+			"Replication lag behind master in seconds",
+			[]string{},
+			config.constantLabels,
+		),
+		pgReplicationIsReplica : prometheus.NewDesc(
+			prometheus.BuildFQName(
+				namespace,
+				replicationSubsystem,
+				"is_replica",
+			),
+			"Indicates if the server is a replica",
+			[]string{},
+			config.constantLabels,
+		),
+	}, nil
 }
 
-var (
-	pgReplicationLag = prometheus.NewDesc(
-		prometheus.BuildFQName(
-			namespace,
-			replicationSubsystem,
-			"lag_seconds",
-		),
-		"Replication lag behind master in seconds",
-		[]string{}, nil,
-	)
-	pgReplicationIsReplica = prometheus.NewDesc(
-		prometheus.BuildFQName(
-			namespace,
-			replicationSubsystem,
-			"is_replica",
-		),
-		"Indicates if the server is a replica",
-		[]string{}, nil,
-	)
-
-	pgReplicationQuery = `SELECT
+var pgReplicationQuery = `SELECT
 	CASE
 		WHEN NOT pg_is_in_recovery() THEN 0
                 WHEN pg_last_wal_receive_lsn () = pg_last_wal_replay_lsn () THEN 0
@@ -62,7 +65,6 @@ var (
 		WHEN pg_is_in_recovery() THEN 1
 		ELSE 0
 	END as is_replica`
-)
 
 func (c *PGReplicationCollector) Update(ctx context.Context, instance *instance, ch chan<- prometheus.Metric) error {
 	db := instance.getDB()
@@ -77,11 +79,11 @@ func (c *PGReplicationCollector) Update(ctx context.Context, instance *instance,
 		return err
 	}
 	ch <- prometheus.MustNewConstMetric(
-		pgReplicationLag,
+		c.pgReplicationLag,
 		prometheus.GaugeValue, lag,
 	)
 	ch <- prometheus.MustNewConstMetric(
-		pgReplicationIsReplica,
+		c.pgReplicationIsReplica,
 		prometheus.GaugeValue, float64(isReplica),
 	)
 	return nil

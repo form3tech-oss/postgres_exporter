@@ -27,22 +27,26 @@ func init() {
 }
 
 type PGPostmasterCollector struct {
+	pgPostMasterStartTimeSeconds *prometheus.Desc
 }
 
-func NewPGPostmasterCollector(collectorConfig) (Collector, error) {
-	return &PGPostmasterCollector{}, nil
+func NewPGPostmasterCollector(config collectorConfig) (Collector, error) {
+	return &PGPostmasterCollector{
+		pgPostMasterStartTimeSeconds : prometheus.NewDesc(
+			prometheus.BuildFQName(
+				namespace,
+				postmasterSubsystem,
+				"start_time_seconds",
+			),
+			"Time at which postmaster started",
+			[]string{}, 
+			config.constantLabels,
+		),
+	}, nil
 }
 
 var (
-	pgPostMasterStartTimeSeconds = prometheus.NewDesc(
-		prometheus.BuildFQName(
-			namespace,
-			postmasterSubsystem,
-			"start_time_seconds",
-		),
-		"Time at which postmaster started",
-		[]string{}, nil,
-	)
+	
 
 	pgPostmasterQuery = "SELECT extract(epoch from pg_postmaster_start_time) from pg_postmaster_start_time();"
 )
@@ -62,7 +66,7 @@ func (c *PGPostmasterCollector) Update(ctx context.Context, instance *instance, 
 		startTimeSecondsMetric = startTimeSeconds.Float64
 	}
 	ch <- prometheus.MustNewConstMetric(
-		pgPostMasterStartTimeSeconds,
+		c.pgPostMasterStartTimeSeconds,
 		prometheus.GaugeValue, startTimeSecondsMetric,
 	)
 	return nil

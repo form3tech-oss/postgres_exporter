@@ -27,72 +27,82 @@ func init() {
 }
 
 type PGStatWalReceiverCollector struct {
-	log log.Logger
+	log                               log.Logger
+	statWalReceiverReceiveStartLsn    *prometheus.Desc
+	statWalReceiverReceiveStartTli    *prometheus.Desc
+	statWalReceiverFlushedLSN         *prometheus.Desc
+	statWalReceiverReceivedTli        *prometheus.Desc
+	statWalReceiverLastMsgSendTime    *prometheus.Desc
+	statWalReceiverLastMsgReceiptTime *prometheus.Desc
+	statWalReceiverLatestEndLsn       *prometheus.Desc
+	statWalReceiverLatestEndTime      *prometheus.Desc
+	statWalReceiverUpstreamNode       *prometheus.Desc
 }
 
 const statWalReceiverSubsystem = "stat_wal_receiver"
 
 func NewPGStatWalReceiverCollector(config collectorConfig) (Collector, error) {
-	return &PGStatWalReceiverCollector{log: config.logger}, nil
+	return &PGStatWalReceiverCollector{
+		log: config.logger,
+		statWalReceiverReceiveStartLsn: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, statWalReceiverSubsystem, "receive_start_lsn"),
+			"First write-ahead log location used when WAL receiver is started represented as a decimal",
+			labelCats,
+			config.constantLabels,
+		),
+		statWalReceiverReceiveStartTli: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, statWalReceiverSubsystem, "receive_start_tli"),
+			"First timeline number used when WAL receiver is started",
+			labelCats,
+			config.constantLabels,
+		),
+		statWalReceiverFlushedLSN: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, statWalReceiverSubsystem, "flushed_lsn"),
+			"Last write-ahead log location already received and flushed to disk, the initial value of this field being the first log location used when WAL receiver is started represented as a decimal",
+			labelCats,
+			config.constantLabels,
+		),
+		statWalReceiverReceivedTli: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, statWalReceiverSubsystem, "received_tli"),
+			"Timeline number of last write-ahead log location received and flushed to disk",
+			labelCats,
+			config.constantLabels,
+		),
+		statWalReceiverLastMsgSendTime: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, statWalReceiverSubsystem, "last_msg_send_time"),
+			"Send time of last message received from origin WAL sender",
+			labelCats,
+			config.constantLabels,
+		),
+		statWalReceiverLastMsgReceiptTime: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, statWalReceiverSubsystem, "last_msg_receipt_time"),
+			"Send time of last message received from origin WAL sender",
+			labelCats,
+			config.constantLabels,
+		),
+		statWalReceiverLatestEndLsn: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, statWalReceiverSubsystem, "latest_end_lsn"),
+			"Last write-ahead log location reported to origin WAL sender as integer",
+			labelCats,
+			config.constantLabels,
+		),
+		statWalReceiverLatestEndTime: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, statWalReceiverSubsystem, "latest_end_time"),
+			"Time of last write-ahead log location reported to origin WAL sender",
+			labelCats,
+			config.constantLabels,
+		),
+		statWalReceiverUpstreamNode: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, statWalReceiverSubsystem, "upstream_node"),
+			"Node ID of the upstream node",
+			labelCats,
+			config.constantLabels,
+		),
+	}, nil
 }
 
 var (
-	labelCats                      = []string{"upstream_host", "slot_name", "status"}
-	statWalReceiverReceiveStartLsn = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, statWalReceiverSubsystem, "receive_start_lsn"),
-		"First write-ahead log location used when WAL receiver is started represented as a decimal",
-		labelCats,
-		prometheus.Labels{},
-	)
-	statWalReceiverReceiveStartTli = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, statWalReceiverSubsystem, "receive_start_tli"),
-		"First timeline number used when WAL receiver is started",
-		labelCats,
-		prometheus.Labels{},
-	)
-	statWalReceiverFlushedLSN = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, statWalReceiverSubsystem, "flushed_lsn"),
-		"Last write-ahead log location already received and flushed to disk, the initial value of this field being the first log location used when WAL receiver is started represented as a decimal",
-		labelCats,
-		prometheus.Labels{},
-	)
-	statWalReceiverReceivedTli = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, statWalReceiverSubsystem, "received_tli"),
-		"Timeline number of last write-ahead log location received and flushed to disk",
-		labelCats,
-		prometheus.Labels{},
-	)
-	statWalReceiverLastMsgSendTime = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, statWalReceiverSubsystem, "last_msg_send_time"),
-		"Send time of last message received from origin WAL sender",
-		labelCats,
-		prometheus.Labels{},
-	)
-	statWalReceiverLastMsgReceiptTime = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, statWalReceiverSubsystem, "last_msg_receipt_time"),
-		"Send time of last message received from origin WAL sender",
-		labelCats,
-		prometheus.Labels{},
-	)
-	statWalReceiverLatestEndLsn = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, statWalReceiverSubsystem, "latest_end_lsn"),
-		"Last write-ahead log location reported to origin WAL sender as integer",
-		labelCats,
-		prometheus.Labels{},
-	)
-	statWalReceiverLatestEndTime = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, statWalReceiverSubsystem, "latest_end_time"),
-		"Time of last write-ahead log location reported to origin WAL sender",
-		labelCats,
-		prometheus.Labels{},
-	)
-	statWalReceiverUpstreamNode = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, statWalReceiverSubsystem, "upstream_node"),
-		"Node ID of the upstream node",
-		labelCats,
-		prometheus.Labels{},
-	)
-
+	labelCats            = []string{"upstream_host", "slot_name", "status"}
 	pgStatWalColumnQuery = `
 	SELECT
 		column_name
@@ -209,57 +219,57 @@ func (c *PGStatWalReceiverCollector) Update(ctx context.Context, instance *insta
 			continue
 		}
 		ch <- prometheus.MustNewConstMetric(
-			statWalReceiverReceiveStartLsn,
+			c.statWalReceiverReceiveStartLsn,
 			prometheus.CounterValue,
 			float64(receiveStartLsn.Int64),
 			labels...)
 
 		ch <- prometheus.MustNewConstMetric(
-			statWalReceiverReceiveStartTli,
+			c.statWalReceiverReceiveStartTli,
 			prometheus.GaugeValue,
 			float64(receiveStartTli.Int64),
 			labels...)
 
 		if hasFlushedLSN {
 			ch <- prometheus.MustNewConstMetric(
-				statWalReceiverFlushedLSN,
+				c.statWalReceiverFlushedLSN,
 				prometheus.CounterValue,
 				float64(flushedLsn.Int64),
 				labels...)
 		}
 
 		ch <- prometheus.MustNewConstMetric(
-			statWalReceiverReceivedTli,
+			c.statWalReceiverReceivedTli,
 			prometheus.GaugeValue,
 			float64(receivedTli.Int64),
 			labels...)
 
 		ch <- prometheus.MustNewConstMetric(
-			statWalReceiverLastMsgSendTime,
+			c.statWalReceiverLastMsgSendTime,
 			prometheus.CounterValue,
 			float64(lastMsgSendTime.Float64),
 			labels...)
 
 		ch <- prometheus.MustNewConstMetric(
-			statWalReceiverLastMsgReceiptTime,
+			c.statWalReceiverLastMsgReceiptTime,
 			prometheus.CounterValue,
 			float64(lastMsgReceiptTime.Float64),
 			labels...)
 
 		ch <- prometheus.MustNewConstMetric(
-			statWalReceiverLatestEndLsn,
+			c.statWalReceiverLatestEndLsn,
 			prometheus.CounterValue,
 			float64(latestEndLsn.Int64),
 			labels...)
 
 		ch <- prometheus.MustNewConstMetric(
-			statWalReceiverLatestEndTime,
+			c.statWalReceiverLatestEndTime,
 			prometheus.CounterValue,
 			latestEndTime.Float64,
 			labels...)
 
 		ch <- prometheus.MustNewConstMetric(
-			statWalReceiverUpstreamNode,
+			c.statWalReceiverUpstreamNode,
 			prometheus.GaugeValue,
 			float64(upstreamNode.Int64),
 			labels...)

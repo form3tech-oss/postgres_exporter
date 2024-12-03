@@ -87,9 +87,10 @@ func TestPGStatDatabaseCollector(t *testing.T) {
 	ch := make(chan prometheus.Metric)
 	go func() {
 		defer close(ch)
-		c := PGStatDatabaseCollector{
-			log: log.With(log.NewNopLogger(), "collector", "pg_stat_database"),
-		}
+		c, _ := NewPGStatDatabaseCollector(collectorConfig{
+			logger:         log.NewNopLogger(),
+			constantLabels: prometheus.Labels{},
+		})
 
 		if err := c.Update(context.Background(), inst, ch); err != nil {
 			t.Errorf("Error calling PGStatDatabaseCollector.Update: %s", err)
@@ -208,9 +209,10 @@ func TestPGStatDatabaseCollectorNullValues(t *testing.T) {
 	ch := make(chan prometheus.Metric)
 	go func() {
 		defer close(ch)
-		c := PGStatDatabaseCollector{
-			log: log.With(log.NewNopLogger(), "collector", "pg_stat_database"),
-		}
+		c, _ := NewPGStatDatabaseCollector(collectorConfig{
+			logger:         log.With(log.NewNopLogger(), "collector", "pg_stat_database"),
+			constantLabels: prometheus.Labels{},
+		})
 
 		if err := c.Update(context.Background(), inst, ch); err != nil {
 			t.Errorf("Error calling PGStatDatabaseCollector.Update: %s", err)
@@ -350,9 +352,10 @@ func TestPGStatDatabaseCollectorRowLeakTest(t *testing.T) {
 	ch := make(chan prometheus.Metric)
 	go func() {
 		defer close(ch)
-		c := PGStatDatabaseCollector{
-			log: log.With(log.NewNopLogger(), "collector", "pg_stat_database"),
-		}
+		c, _ := NewPGStatDatabaseCollector(collectorConfig{
+			logger:         log.With(log.NewNopLogger(), "collector", "pg_stat_database"),
+			constantLabels: prometheus.Labels{},
+		})
 
 		if err := c.Update(context.Background(), inst, ch); err != nil {
 			t.Errorf("Error calling PGStatDatabaseCollector.Update: %s", err)
@@ -466,9 +469,10 @@ func TestPGStatDatabaseCollectorTestNilStatReset(t *testing.T) {
 	ch := make(chan prometheus.Metric)
 	go func() {
 		defer close(ch)
-		c := PGStatDatabaseCollector{
-			log: log.With(log.NewNopLogger(), "collector", "pg_stat_database"),
-		}
+		c, _ := NewPGStatDatabaseCollector(collectorConfig{
+			logger:         log.With(log.NewNopLogger(), "collector", "pg_stat_database"),
+			constantLabels: prometheus.Labels{},
+		})
 
 		if err := c.Update(context.Background(), inst, ch); err != nil {
 			t.Errorf("Error calling PGStatDatabaseCollector.Update: %s", err)

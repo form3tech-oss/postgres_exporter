@@ -1,6 +1,5 @@
 go:
-    # This must match .circle/config.yml.
-    version: 1.21
+    version: 1.22
 repository:
     path: github.com/form3tech-oss/postgres_exporter
 build:

@@ -30,6 +30,8 @@ func init() {
 type PGDatabaseCollector struct {
 	log               log.Logger
 	excludedDatabases []string
+	pgDatabaseSizeDesc *prometheus.Desc
+	pgDatabaseConnectionLimitsDesc *prometheus.Desc
 }
 
 func NewPGDatabaseCollector(config collectorConfig) (Collector, error) {
@@ -40,29 +42,28 @@ func NewPGDatabaseCollector(config collectorConfig) (Collector, error) {
 	return &PGDatabaseCollector{
 		log:               config.logger,
 		excludedDatabases: exclude,
+		pgDatabaseSizeDesc: prometheus.NewDesc(
+			prometheus.BuildFQName(
+				namespace,
+				databaseSubsystem,
+				"size_bytes",
+			),
+			"Disk space used by the database",
+			[]string{"datname"}, config.constantLabels,
+		),
+		pgDatabaseConnectionLimitsDesc: prometheus.NewDesc(
+			prometheus.BuildFQName(
+				namespace,
+				databaseSubsystem,
+				"connection_limit",
+			),
+			"Connection limit set for the database",
+			[]string{"datname"}, config.constantLabels,
+		),
 	}, nil
 }
 
 var (
-	pgDatabaseSizeDesc = prometheus.NewDesc(
-		prometheus.BuildFQName(
-			namespace,
-			databaseSubsystem,
-			"size_bytes",
-		),
-		"Disk space used by the database",
-		[]string{"datname"}, nil,
-	)
-	pgDatabaseConnectionLimitsDesc = prometheus.NewDesc(
-		prometheus.BuildFQName(
-			namespace,
-			databaseSubsystem,
-			"connection_limit",
-		),
-		"Connection limit set for the database",
-		[]string{"datname"}, nil,
-	)
-
 	pgDatabaseQuery     = "SELECT pg_database.datname, pg_database.datconnlimit FROM pg_database;"
 	pgDatabaseSizeQuery = "SELECT pg_database_size($1)"
 )
@@ -113,7 +114,7 @@ func (c PGDatabaseCollector) Update(ctx context.Context, instance *instance, ch 
 			connLimitMetric = float64(connLimit.Int64)
 		}
 		ch <- prometheus.MustNewConstMetric(
-			pgDatabaseConnectionLimitsDesc,
+			c.pgDatabaseConnectionLimitsDesc,
 			prometheus.GaugeValue, connLimitMetric, database,
 		)
 	}
@@ -131,7 +132,7 @@ func (c PGDatabaseCollector) Update(ctx context.Context, instance *instance, ch 
 			sizeMetric = size.Float64
 		}
 		ch <- prometheus.MustNewConstMetric(
-			pgDatabaseSizeDesc,
+			c.pgDatabaseSizeDesc,
 			prometheus.GaugeValue, sizeMetric, datname,
 		)
 

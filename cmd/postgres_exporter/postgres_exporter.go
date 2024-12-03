@@ -415,7 +415,7 @@ type Exporter struct {
 	userQueriesPath  string
 	constantLabels   prometheus.Labels
 	duration         prometheus.Gauge
-	error            prometheus.Gauge
+	errors            prometheus.Gauge
 	psqlUp           prometheus.Gauge
 	userQueriesError *prometheus.GaugeVec
 	totalScrapes     prometheus.Counter
@@ -537,7 +537,7 @@ func (e *Exporter) setupInternalMetrics() {
 		Help:        "Total number of times PostgreSQL was scraped for metrics.",
 		ConstLabels: e.constantLabels,
 	})
-	e.error = prometheus.NewGauge(prometheus.GaugeOpts{
+	e.errors = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace:   namespace,
 		Subsystem:   exporter,
 		Name:        "last_scrape_error",
@@ -569,7 +569,7 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 
 	ch <- e.duration
 	ch <- e.totalScrapes
-	ch <- e.error
+	ch <- e.errors
 	ch <- e.psqlUp
 	e.userQueriesError.Collect(ch)
 }
@@ -676,6 +676,7 @@ func (e *Exporter) scrape(ch chan<- prometheus.Metric) {
 	var connectionErrorsCount int
 
 	for _, dsn := range dsns {
+		level.Debug(logger).Log("msg", "start scrape", "dsn", dsn)
 		if err := e.scrapeDSN(ch, dsn); err != nil {
 			errorsCount++
 
@@ -696,8 +697,8 @@ func (e *Exporter) scrape(ch chan<- prometheus.Metric) {
 
 	switch errorsCount {
 	case 0:
-		e.error.Set(0)
+		e.errors.Set(0)
 	default:
-		e.error.Set(1)
+		e.errors.Set(1)
 	}
 }

@@ -17,6 +17,7 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/go-kit/log"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/smartystreets/goconvey/convey"
@@ -44,7 +45,10 @@ func TestPgStatioUserIndexesCollector(t *testing.T) {
 	ch := make(chan prometheus.Metric)
 	go func() {
 		defer close(ch)
-		c := PGStatioUserIndexesCollector{}
+		c, _ := NewPGStatioUserIndexesCollector(collectorConfig{
+			logger: log.NewNopLogger(),
+			constantLabels: prometheus.Labels{},
+		})
 
 		if err := c.Update(context.Background(), inst, ch); err != nil {
 			t.Errorf("Error calling PGStatioUserIndexesCollector.Update: %s", err)
@@ -87,7 +91,10 @@ func TestPgStatioUserIndexesCollectorNull(t *testing.T) {
 	ch := make(chan prometheus.Metric)
 	go func() {
 		defer close(ch)
-		c := PGStatioUserIndexesCollector{}
+		c, _ := NewPGStatioUserIndexesCollector(collectorConfig{
+			logger: log.NewNopLogger(),
+			constantLabels: prometheus.Labels{},
+		})
 
 		if err := c.Update(context.Background(), inst, ch); err != nil {
 			t.Errorf("Error calling PGStatioUserIndexesCollector.Update: %s", err)

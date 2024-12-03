@@ -29,31 +29,30 @@ func init() {
 
 type PGRolesCollector struct {
 	log log.Logger
+	pgRolesConnectionLimitsDesc *prometheus.Desc
 }
 
 func NewPGRolesCollector(config collectorConfig) (Collector, error) {
 	return &PGRolesCollector{
 		log: config.logger,
+		pgRolesConnectionLimitsDesc: prometheus.NewDesc(
+			prometheus.BuildFQName(
+				namespace,
+				rolesSubsystem,
+				"connection_limit",
+			),
+			"Connection limit set for the role",
+			[]string{"rolname"},
+			config.constantLabels,
+		),
 	}, nil
 }
 
-var (
-	pgRolesConnectionLimitsDesc = prometheus.NewDesc(
-		prometheus.BuildFQName(
-			namespace,
-			rolesSubsystem,
-			"connection_limit",
-		),
-		"Connection limit set for the role",
-		[]string{"rolname"}, nil,
-	)
-
-	pgRolesConnectionLimitsQuery = "SELECT pg_roles.rolname, pg_roles.rolconnlimit FROM pg_roles"
-)
+var pgRolesConnectionLimitsQuery = "SELECT pg_roles.rolname, pg_roles.rolconnlimit FROM pg_roles"
 
 // Update implements Collector and exposes roles connection limits.
 // It is called by the Prometheus registry when collecting metrics.
-func (c PGRolesCollector) Update(ctx context.Context, instance *instance, ch chan<- prometheus.Metric) error {
+func (c *PGRolesCollector) Update(ctx context.Context, instance *instance, ch chan<- prometheus.Metric) error {
 	db := instance.getDB()
 	// Query the list of databases
 	rows, err := db.QueryContext(ctx,
@@ -82,7 +81,7 @@ func (c PGRolesCollector) Update(ctx context.Context, instance *instance, ch cha
 		connLimitMetric := float64(connLimit.Int64)
 
 		ch <- prometheus.MustNewConstMetric(
-			pgRolesConnectionLimitsDesc,
+			c.pgRolesConnectionLimitsDesc,
 			prometheus.GaugeValue, connLimitMetric, rolnameLabel,
 		)
 	}

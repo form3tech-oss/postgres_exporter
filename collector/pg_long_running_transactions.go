@@ -28,27 +28,29 @@ func init() {
 
 type PGLongRunningTransactionsCollector struct {
 	log log.Logger
+	longRunningTransactionsCount *prometheus.Desc
+	longRunningTransactionsAgeInSeconds *prometheus.Desc
 }
 
 func NewPGLongRunningTransactionsCollector(config collectorConfig) (Collector, error) {
-	return &PGLongRunningTransactionsCollector{log: config.logger}, nil
+	return &PGLongRunningTransactionsCollector{
+		log: config.logger,
+		longRunningTransactionsCount : prometheus.NewDesc(
+			"pg_long_running_transactions",
+			"Current number of long running transactions",
+			[]string{},
+			config.constantLabels,
+		),
+		longRunningTransactionsAgeInSeconds : prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, longRunningTransactionsSubsystem, "oldest_timestamp_seconds"),
+			"The current maximum transaction age in seconds",
+			[]string{},
+			config.constantLabels,
+		),
+	}, nil
 }
 
 var (
-	longRunningTransactionsCount = prometheus.NewDesc(
-		"pg_long_running_transactions",
-		"Current number of long running transactions",
-		[]string{},
-		prometheus.Labels{},
-	)
-
-	longRunningTransactionsAgeInSeconds = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, longRunningTransactionsSubsystem, "oldest_timestamp_seconds"),
-		"The current maximum transaction age in seconds",
-		[]string{},
-		prometheus.Labels{},
-	)
-
 	longRunningTransactionsQuery = `
 	SELECT
 		COUNT(*) as transactions,
@@ -58,7 +60,7 @@ var (
 	`
 )
 
-func (PGLongRunningTransactionsCollector) Update(ctx context.Context, instance *instance, ch chan<- prometheus.Metric) error {
+func (c *PGLongRunningTransactionsCollector) Update(ctx context.Context, instance *instance, ch chan<- prometheus.Metric) error {
 	db := instance.getDB()
 	rows, err := db.QueryContext(ctx,
 		longRunningTransactionsQuery)
@@ -76,12 +78,12 @@ func (PGLongRunningTransactionsCollector) Update(ctx context.Context, instance *
 		}
 
 		ch <- prometheus.MustNewConstMetric(
-			longRunningTransactionsCount,
+			c.longRunningTransactionsCount,
 			prometheus.GaugeValue,
 			transactions,
 		)
 		ch <- prometheus.MustNewConstMetric(
-			longRunningTransactionsAgeInSeconds,
+			c.longRunningTransactionsAgeInSeconds,
 			prometheus.GaugeValue,
 			ageInSeconds,
 		)

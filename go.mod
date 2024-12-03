@@ -1,6 +1,6 @@
 module github.com/form3tech-oss/postgres_exporter
 
-go 1.20
+go 1.22
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2

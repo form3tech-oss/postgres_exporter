@@ -29,24 +29,27 @@ func init() {
 
 type PGLocksCollector struct {
 	log log.Logger
+	pgLocksDesc *prometheus.Desc
 }
 
 func NewPGLocksCollector(config collectorConfig) (Collector, error) {
 	return &PGLocksCollector{
 		log: config.logger,
+		pgLocksDesc : prometheus.NewDesc(
+			prometheus.BuildFQName(
+				namespace,
+				locksSubsystem,
+				"count",
+			),
+			"Number of locks",
+			[]string{"datname", "mode"}, 
+			config.constantLabels,
+		),
 	}, nil
 }
 
 var (
-	pgLocksDesc = prometheus.NewDesc(
-		prometheus.BuildFQName(
-			namespace,
-			locksSubsystem,
-			"count",
-		),
-		"Number of locks",
-		[]string{"datname", "mode"}, nil,
-	)
+	
 
 	pgLocksQuery = `
 		SELECT 
@@ -117,7 +120,7 @@ func (c PGLocksCollector) Update(ctx context.Context, instance *instance, ch cha
 		}
 
 		ch <- prometheus.MustNewConstMetric(
-			pgLocksDesc,
+			c.pgLocksDesc,
 			prometheus.GaugeValue, countMetric,
 			datname.String, mode.String,
 		)

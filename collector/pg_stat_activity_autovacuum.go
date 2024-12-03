@@ -27,21 +27,23 @@ func init() {
 }
 
 type PGStatActivityAutovacuumCollector struct {
-	log log.Logger
+	log                                log.Logger
+	statActivityAutovacuumAgeInSeconds *prometheus.Desc
 }
 
 func NewPGStatActivityAutovacuumCollector(config collectorConfig) (Collector, error) {
-	return &PGStatActivityAutovacuumCollector{log: config.logger}, nil
+	return &PGStatActivityAutovacuumCollector{
+		log: config.logger,
+		statActivityAutovacuumAgeInSeconds: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, statActivityAutovacuumSubsystem, "timestamp_seconds"),
+			"Start timestamp of the vacuum process in seconds",
+			[]string{"relname"},
+			config.constantLabels,
+		),
+	}, nil
 }
 
 var (
-	statActivityAutovacuumAgeInSeconds = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, statActivityAutovacuumSubsystem, "timestamp_seconds"),
-		"Start timestamp of the vacuum process in seconds",
-		[]string{"relname"},
-		prometheus.Labels{},
-	)
-
 	statActivityAutovacuumQuery = `
     SELECT
 		SPLIT_PART(query, '.', 2) AS relname,
@@ -53,7 +55,7 @@ var (
 	`
 )
 
-func (PGStatActivityAutovacuumCollector) Update(ctx context.Context, instance *instance, ch chan<- prometheus.Metric) error {
+func (c *PGStatActivityAutovacuumCollector) Update(ctx context.Context, instance *instance, ch chan<- prometheus.Metric) error {
 	db := instance.getDB()
 	rows, err := db.QueryContext(ctx,
 		statActivityAutovacuumQuery)
@@ -72,7 +74,7 @@ func (PGStatActivityAutovacuumCollector) Update(ctx context.Context, instance *i
 		}
 
 		ch <- prometheus.MustNewConstMetric(
-			statActivityAutovacuumAgeInSeconds,
+			c.statActivityAutovacuumAgeInSeconds,
 			prometheus.GaugeValue,
 			ageInSeconds, relname,
 		)

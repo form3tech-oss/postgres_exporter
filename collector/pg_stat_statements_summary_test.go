@@ -17,44 +17,45 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/blang/semver/v4"
 	"github.com/go-kit/log"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/smartystreets/goconvey/convey"
 )
 
-func TestPGLongRunningTransactionsCollector(t *testing.T) {
+func TestPGStateStatementsSummaryCollector(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
 		t.Fatalf("Error opening a stub db connection: %s", err)
 	}
 	defer db.Close()
-	inst := &instance{db: db}
-	columns := []string{
-		"transactions",
-		"age_in_seconds",
-	}
-	rows := sqlmock.NewRows(columns).
-		AddRow(20, 1200)
 
-	mock.ExpectQuery(sanitizeQuery(longRunningTransactionsQuery)).WillReturnRows(rows)
+	inst := &instance{db: db, version: semver.MustParse("13.3.7")}
+
+	columns := []string{"datname", "calls_total", "seconds_total"}
+	rows := sqlmock.NewRows(columns).
+		AddRow("postgres", 5, 0.4)
+	mock.ExpectQuery(sanitizeQuery(pgStatStatementsSummaryQuery)).WillReturnRows(rows)
 
 	ch := make(chan prometheus.Metric)
 	go func() {
 		defer close(ch)
-		c, _ := NewPGLongRunningTransactionsCollector(collectorConfig{
+		c, _ := NewPGStatStatementsSummaryCollector(collectorConfig{
 			logger: log.NewNopLogger(),
 			constantLabels: prometheus.Labels{},
 		})
 
 		if err := c.Update(context.Background(), inst, ch); err != nil {
-			t.Errorf("Error calling PGLongRunningTransactionsCollector.Update: %s", err)
+			t.Errorf("Error calling PGStatStatementsSummaryCollector.Update: %s", err)
 		}
 	}()
+
 	expected := []MetricResult{
-		{labels: labelMap{}, value: 20, metricType: dto.MetricType_GAUGE},
-		{labels: labelMap{}, value: 1200, metricType: dto.MetricType_GAUGE},
+		{labels: labelMap{"datname": "postgres"}, metricType: dto.MetricType_COUNTER, value: 5},
+		{labels: labelMap{"datname": "postgres"}, metricType: dto.MetricType_COUNTER, value: 0.4},
 	}
+
 	convey.Convey("Metrics comparison", t, func() {
 		for _, expect := range expected {
 			m := readMetric(<-ch)

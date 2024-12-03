@@ -25,30 +25,32 @@ func init() {
 }
 
 type PGStatioUserIndexesCollector struct {
-	log log.Logger
+	log                          log.Logger
+	statioUserIndexesIdxBlksRead *prometheus.Desc
+	statioUserIndexesIdxBlksHit  *prometheus.Desc
 }
 
 const statioUserIndexesSubsystem = "statio_user_indexes"
 
 func NewPGStatioUserIndexesCollector(config collectorConfig) (Collector, error) {
-	return &PGStatioUserIndexesCollector{log: config.logger}, nil
+	return &PGStatioUserIndexesCollector{
+		log: config.logger,
+		statioUserIndexesIdxBlksRead: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, statioUserIndexesSubsystem, "idx_blks_read_total"),
+			"Number of disk blocks read from this index",
+			[]string{"schemaname", "relname", "indexrelname"},
+			config.constantLabels,
+		),
+		statioUserIndexesIdxBlksHit: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, statioUserIndexesSubsystem, "idx_blks_hit_total"),
+			"Number of buffer hits in this index",
+			[]string{"schemaname", "relname", "indexrelname"},
+			config.constantLabels,
+		),
+	}, nil
 }
 
-var (
-	statioUserIndexesIdxBlksRead = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, statioUserIndexesSubsystem, "idx_blks_read_total"),
-		"Number of disk blocks read from this index",
-		[]string{"schemaname", "relname", "indexrelname"},
-		prometheus.Labels{},
-	)
-	statioUserIndexesIdxBlksHit = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, statioUserIndexesSubsystem, "idx_blks_hit_total"),
-		"Number of buffer hits in this index",
-		[]string{"schemaname", "relname", "indexrelname"},
-		prometheus.Labels{},
-	)
-
-	statioUserIndexesQuery = `
+var statioUserIndexesQuery = `
 	SELECT
 		schemaname,
 		relname,
@@ -57,8 +59,6 @@ var (
 		idx_blks_hit
 	FROM pg_statio_user_indexes
 	`
-)
-
 func (c *PGStatioUserIndexesCollector) Update(ctx context.Context, instance *instance, ch chan<- prometheus.Metric) error {
 	db := instance.getDB()
 	rows, err := db.QueryContext(ctx,
@@ -94,7 +94,7 @@ func (c *PGStatioUserIndexesCollector) Update(ctx context.Context, instance *ins
 			idxBlksReadMetric = idxBlksRead.Float64
 		}
 		ch <- prometheus.MustNewConstMetric(
-			statioUserIndexesIdxBlksRead,
+			c.statioUserIndexesIdxBlksRead,
 			prometheus.CounterValue,
 			idxBlksReadMetric,
 			labels...,
@@ -105,7 +105,7 @@ func (c *PGStatioUserIndexesCollector) Update(ctx context.Context, instance *ins
 			idxBlksHitMetric = idxBlksHit.Float64
 		}
 		ch <- prometheus.MustNewConstMetric(
-			statioUserIndexesIdxBlksHit,
+			c.statioUserIndexesIdxBlksHit,
 			prometheus.CounterValue,
 			idxBlksHitMetric,
 			labels...,

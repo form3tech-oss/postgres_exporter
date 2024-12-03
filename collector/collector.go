@@ -64,6 +64,7 @@ type Collector interface {
 type collectorConfig struct {
 	logger           log.Logger
 	excludeDatabases []string
+	constantLabels   prometheus.Labels
 }
 
 func registerCollector(name string, isDefaultEnabled bool, createFunc func(collectorConfig) (Collector, error)) {
@@ -92,9 +93,18 @@ type PostgresCollector struct {
 	logger     log.Logger
 
 	instance *instance
+	constantLabels prometheus.Labels
 }
 
 type Option func(*PostgresCollector) error
+
+// WithConstantLabels configures constant labels.
+func WithConstantLabels(l prometheus.Labels) Option {
+	return func(c *PostgresCollector) error {
+		c.constantLabels = l
+		return nil
+	}
+}
 
 // NewPostgresCollector creates a new PostgresCollector.
 func NewPostgresCollector(logger log.Logger, excludeDatabases []string, dsn string, filters []string, options ...Option) (*PostgresCollector, error) {
@@ -134,6 +144,7 @@ func NewPostgresCollector(logger log.Logger, excludeDatabases []string, dsn stri
 			collector, err := factories[key](collectorConfig{
 				logger:           log.With(logger, "collector", key),
 				excludeDatabases: excludeDatabases,
+				constantLabels:   p.constantLabels,
 			})
 			if err != nil {
 				return nil, err
