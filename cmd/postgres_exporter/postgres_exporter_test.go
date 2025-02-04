@@ -230,6 +230,10 @@ func (s *FunctionalSuite) TestParseFingerprint(c *C) {
 			fingerprint: "localhost:55432",
 		},
 		{
+			url:         "postgresql://userDsn:passwordDsn%3D@localhost:55432/foo?sslmode=disabled&options=-c%20statement_timeout%3D3min%20-c%20statement_timeout%3D1min",
+			fingerprint: "localhost:55432",
+		},
+		{
 			url:         "port=1234",
 			fingerprint: "localhost:1234",
 		},

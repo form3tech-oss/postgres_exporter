@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"math"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -177,7 +178,12 @@ func parseFingerprint(url string) (string, error) {
 		dsn = url
 	}
 
-	pairs := strings.Split(dsn, " ")
+	re, _ := regexp.Compile(`[a-z_]+=(?:(?:'[^']+')|(?:[^\s]+))`)
+	pairs := re.FindAllString(dsn, -1)
+	if pairs == nil {
+		return "", fmt.Errorf("malformed dsn %q", dsn)
+	}
+
 	kv := make(map[string]string, len(pairs))
 	for _, pair := range pairs {
 		splitted := strings.SplitN(pair, "=", 2)

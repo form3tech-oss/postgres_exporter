@@ -415,7 +415,7 @@ type Exporter struct {
 	userQueriesPath  string
 	constantLabels   prometheus.Labels
 	duration         prometheus.Gauge
-	errors            prometheus.Gauge
+	errors           prometheus.Gauge
 	psqlUp           prometheus.Gauge
 	userQueriesError *prometheus.GaugeVec
 	totalScrapes     prometheus.Counter
