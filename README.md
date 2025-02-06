@@ -255,6 +255,15 @@ The following environment variables configure the exporter:
 
 * `PG_EXPORTER_METRIC_PREFIX`
   A prefix to use for each of the default metrics exported by postgres-exporter. Default is `pg`
+  
+* `PG_MAX_CONNECTIONS`
+  Maximum number of open connections by the collector `-1`
+
+* `PG_MAX_IDLE_CONNECTIONS`
+  Maximum number of idle connections by the collector `-1`
+
+* `PG_SCRAPE_TIMEOUT`
+  Single collector timeout `10s`
 
 Settings set by environment variables starting with `PG_` will be overwritten by the corresponding CLI flag if given.
 

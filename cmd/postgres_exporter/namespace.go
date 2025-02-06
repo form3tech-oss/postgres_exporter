@@ -14,6 +14,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -27,7 +28,7 @@ import (
 
 // Query within a namespace mapping and emit metrics. Returns fatal errors if
 // the scrape fails, and a slice of errors if they were non-fatal.
-func queryNamespaceMapping(server *Server, namespace string, mapping MetricMapNamespace) ([]prometheus.Metric, []error, error) {
+func queryNamespaceMappingWithContext(ctx context.Context, server *Server, namespace string, mapping MetricMapNamespace) ([]prometheus.Metric, []error, error) {
 	// Check for a query override for this namespace
 	query, found := server.queryOverrides[namespace]
 
@@ -45,19 +46,19 @@ func queryNamespaceMapping(server *Server, namespace string, mapping MetricMapNa
 	if !found {
 		// I've no idea how to avoid this properly at the moment, but this is
 		// an admin tool so you're not injecting SQL right?
-		rows, err = server.db.Query(fmt.Sprintf("SELECT * FROM %s;", namespace)) // nolint: gas
+		rows, err = server.db.QueryContext(ctx, fmt.Sprintf("SELECT * FROM %s;", namespace)) // nolint: gas
 	} else {
-		rows, err = server.db.Query(query)
+		rows, err = server.db.QueryContext(ctx, query)
 	}
 	if err != nil {
-		return []prometheus.Metric{}, []error{}, fmt.Errorf("Error running query on database %q: %s %v", server, namespace, err)
+		return []prometheus.Metric{}, []error{}, fmt.Errorf("error running query on database %q: %s %v", server, namespace, err)
 	}
 	defer rows.Close() // nolint: errcheck
 
 	var columnNames []string
 	columnNames, err = rows.Columns()
 	if err != nil {
-		return []prometheus.Metric{}, []error{}, errors.New(fmt.Sprintln("Error retrieving column list for: ", namespace, err))
+		return []prometheus.Metric{}, []error{}, errors.New(fmt.Sprintln("error retrieving column list for: ", namespace, err))
 	}
 
 	// Make a lookup map for the column indices
@@ -183,17 +184,17 @@ func queryNamespaceMapping(server *Server, namespace string, mapping MetricMapNa
 
 // Iterate through all the namespace mappings in the exporter and run their
 // queries.
-func queryNamespaceMappings(ch chan<- prometheus.Metric, server *Server) map[string]error {
+func queryNamespaceMappings(ctx context.Context, ch chan<- prometheus.Metric, server *Server) map[string]error {
 	// Return a map of namespace -> errors
 	namespaceErrors := make(map[string]error)
 
 	scrapeStart := time.Now()
 
 	for namespace, mapping := range server.metricMap {
-		level.Debug(logger).Log("msg", "Querying namespace", "namespace", namespace)
+		level.Debug(logger).Log("msg", "querying namespace", "namespace", namespace)
 
 		if mapping.master && !server.master {
-			level.Debug(logger).Log("msg", "Query skipped...")
+			level.Debug(logger).Log("msg", "query skipped...", "namespace", namespace)
 			continue
 		}
 
@@ -202,7 +203,7 @@ func queryNamespaceMappings(ch chan<- prometheus.Metric, server *Server) map[str
 			serVersion, _ := semver.Parse(server.lastMapVersion.String())
 			runServerRange, _ := semver.ParseRange(server.runonserver)
 			if !runServerRange(serVersion) {
-				level.Debug(logger).Log("msg", "Query skipped for this database version", "version", server.lastMapVersion.String(), "target_version", server.runonserver)
+				level.Debug(logger).Log("msg", "query skipped for this database version", "version", server.lastMapVersion.String(), "target_version", server.runonserver)
 				continue
 			}
 		}
@@ -225,20 +226,21 @@ func queryNamespaceMappings(ch chan<- prometheus.Metric, server *Server) map[str
 		var nonFatalErrors []error
 		var err error
 		if scrapeMetric {
-			metrics, nonFatalErrors, err = queryNamespaceMapping(server, namespace, mapping)
-		} else {
+			metrics, nonFatalErrors, err = queryNamespaceMappingWithContext(ctx, server, namespace, mapping)
+			} else {
+			level.Debug(logger).Log("msg", "found cached metrics", "namespace", namespace)
 			metrics = cachedMetric.metrics
 		}
 
 		// Serious error - a namespace disappeared
 		if err != nil {
 			namespaceErrors[namespace] = err
-			level.Info(logger).Log("err", err)
+			level.Error(logger).Log("err", err)
 		}
 		// Non-serious errors - likely version or parsing problems.
 		if len(nonFatalErrors) > 0 {
 			for _, err := range nonFatalErrors {
-				level.Info(logger).Log("err", err)
+				level.Error(logger).Log("err", err)
 			}
 		}
 

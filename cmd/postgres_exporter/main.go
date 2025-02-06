@@ -14,12 +14,16 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
 	"net/http"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
+	"time"
 
 	"github.com/alecthomas/kingpin/v2"
 	"github.com/form3tech-oss/postgres_exporter/collector"
@@ -53,6 +57,9 @@ var (
 	excludeDatabases       = kingpin.Flag("exclude-databases", "A list of databases to remove when autoDiscoverDatabases is enabled (DEPRECATED)").Default("").Envar("PG_EXPORTER_EXCLUDE_DATABASES").String()
 	includeDatabases       = kingpin.Flag("include-databases", "A list of databases to include when autoDiscoverDatabases is enabled (DEPRECATED)").Default("").Envar("PG_EXPORTER_INCLUDE_DATABASES").String()
 	metricPrefix           = kingpin.Flag("metric-prefix", "A metric prefix can be used to have non-default (not \"pg\") prefixes for each of the metrics").Default("pg").Envar("PG_EXPORTER_METRIC_PREFIX").String()
+	maxOpenConnections     = kingpin.Flag("max-connections", "the maximum number of opened connections").Default("-1").Envar("PG_MAX_CONNECTIONS").Int()
+	maxIdleConnections     = kingpin.Flag("max-idle-connections", "the maximum number of idle connections").Default("-1").Envar("PG_MAX_IDLE_CONNECTIONS").Int()
+	collectorTimeout       = kingpin.Flag("collector-timeout", "the single collector scrape timeout").Default("10s").Envar("PG_COLLECTOR_TIMEOUT").Duration()
 	logger                 = log.NewNopLogger()
 )
 
@@ -130,12 +137,11 @@ func main() {
 		WithConstantLabels(*constantLabelsList),
 		ExcludeDatabases(excludedDatabases),
 		IncludeDatabases(*includeDatabases),
+		WithMaxOpenConnections(*maxOpenConnections),
+		WithMaxIdleConnections(*maxIdleConnections),
 	}
 
 	exporter := NewExporter(dsns, opts...)
-	defer func() {
-		exporter.servers.Close()
-	}()
 
 	reg := prometheus.NewRegistry()
 
@@ -149,9 +155,19 @@ func main() {
 	if len(dsns) > 0 {
 		dsn = dsns[0]
 	}
-	
+
 	collOpts := []collector.Option{
 		collector.WithConstantLabels(parseConstLabels(*constantLabelsList)),
+		collector.WithMaxIdleConnections(*maxIdleConnections),
+		collector.WithMaxOpenConnections(*maxOpenConnections),
+		collector.WithScrapeTimeout(*collectorTimeout),
+	}
+
+	if *maxOpenConnections >= 0 {
+		collOpts = append(collOpts, collector.WithMaxOpenConnections(*maxOpenConnections))
+	}
+	if *maxIdleConnections >= 0 {
+		collOpts = append(collOpts, collector.WithMaxIdleConnections(*maxIdleConnections))
 	}
 
 	pgColl, err := collector.NewPostgresCollector(
@@ -159,12 +175,11 @@ func main() {
 		excludedDatabases,
 		dsn,
 		[]string{},
-		collOpts...
+		collOpts...,
 	)
 	if err != nil {
-		level.Warn(logger).Log("msg", "Failed to create PostgresCollector", "err", err.Error())
+		level.Error(logger).Log("msg", "Failed to create PostgresCollector", "err", err.Error())
 	} else {
-		
 		reg.MustRegister(pgColl)
 	}
 
@@ -190,13 +205,30 @@ func main() {
 		http.Handle("/", landingPage)
 	}
 
-	http.HandleFunc("/probe", handleProbe(logger, excludedDatabases))
-
 	srv := &http.Server{}
-	if err := web.ListenAndServe(srv, webConfig, logger); err != nil {
-		level.Error(logger).Log("msg", "Error running HTTP server", "err", err)
+	srv.RegisterOnShutdown(func() {
+		level.Info(logger).Log("msg", "gracefully shutting down HTTP server")
+		exporter.servers.Close()
+		pgColl.Close()
+	})
+
+	go func() {
+		if err := web.ListenAndServe(srv, webConfig, logger); !errors.Is(err, http.ErrServerClosed) {
+			level.Error(logger).Log("msg", "running HTTP server", "err", err)
+		}
+	}()
+
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	<-sigChan
+
+	shutdownCtx, shutdownRelease := context.WithTimeout(context.Background(), 30*time.Second)
+	defer shutdownRelease()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		level.Error(logger).Log("msg", "during HTTP server shut down", "err", err)
 		os.Exit(1)
 	}
+	level.Info(logger).Log("msg", "HTTP server gracefully shut down")
 }
 
 func runHealthCheck(webConfig *web.FlagConfig) (bool, error) {
