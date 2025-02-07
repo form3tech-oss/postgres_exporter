@@ -540,7 +540,12 @@ func NewExporter(dsn []string, opts ...ExporterOpt) *Exporter {
 	}
 
 	e.setupInternalMetrics()
-	e.servers = NewServers(ServerWithLabels(e.constantLabels))
+	e.servers = NewServers(
+		ServerWithLabels(e.constantLabels),
+		ServerWithMaxIdleConnections(*maxIdleConnections),
+		ServerWithMaxOpenConnections(*maxOpenConnections),
+		ServerWithScrapeTimeout(e.scrapeTimeout),
+	)
 
 	return e
 }

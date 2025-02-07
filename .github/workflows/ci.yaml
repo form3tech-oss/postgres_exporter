@@ -31,10 +31,10 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - name: Build
-        run: make crossbuild
       - name: Set version
         run: echo "${{ needs.calculate-tag.outputs.tag }}" | sed s/v//g > VERSION
+      - name: Build
+        run: make crossbuild
       - name: Package
         run: make crossbuild-tarballs
       - name: Archive artifacts
