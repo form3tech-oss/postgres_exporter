@@ -14,6 +14,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"sync"
@@ -43,6 +44,11 @@ type Server struct {
 	// Currently cached metrics
 	metricCache map[string]cachedMetrics
 	cacheMtx    sync.Mutex
+
+	// Connection settings and timeout
+	maxOpenConnections int
+	maxIdleConnections int
+	scrapeTimeout      time.Duration	
 }
 
 // ServerOpt configures a server.
@@ -57,6 +63,24 @@ func ServerWithLabels(labels prometheus.Labels) ServerOpt {
 	}
 }
 
+func ServerWithMaxOpenConnections(n int) ServerOpt {
+	return func(e *Server) {
+		e.maxOpenConnections = n
+	}
+}
+
+func ServerWithMaxIdleConnections(n int) ServerOpt {
+	return func(e *Server) {
+		e.maxIdleConnections = n
+	}
+}
+
+func ServerWithScrapeTimeout(d time.Duration) ServerOpt {
+	return func(e *Server) {
+		e.scrapeTimeout = d
+	}
+}
+
 // NewServer establishes a new connection using DSN.
 func NewServer(dsn string, opts ...ServerOpt) (*Server, error) {
 	fingerprint, err := parseFingerprint(dsn)
@@ -68,10 +92,8 @@ func NewServer(dsn string, opts ...ServerOpt) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	db.SetMaxOpenConns(1)
-	db.SetMaxIdleConns(1)
 
-	level.Info(logger).Log("msg", "Established new database connection", "fingerprint", fingerprint)
+	level.Info(logger).Log("msg", "setting up new server", "fingerprint", fingerprint)
 
 	s := &Server{
 		db:     db,
@@ -85,6 +107,9 @@ func NewServer(dsn string, opts ...ServerOpt) (*Server, error) {
 	for _, opt := range opts {
 		opt(s)
 	}
+
+	s.db.SetMaxOpenConns(s.maxOpenConnections)
+	s.db.SetMaxIdleConns(s.maxIdleConnections)
 
 	return s, nil
 }
@@ -123,7 +148,10 @@ func (s *Server) Scrape(ch chan<- prometheus.Metric, disableSettingsMetrics bool
 		}
 	}
 
-	errMap := queryNamespaceMappings(ch, s)
+	ctx, cancel := context.WithTimeout(context.TODO(), s.scrapeTimeout)
+	defer cancel()
+
+	errMap := queryNamespaceMappings(ctx, ch, s)
 	if len(errMap) > 0 {
 		err = fmt.Errorf("queryNamespaceMappings returned %d errors", len(errMap))
 	}
@@ -163,6 +191,7 @@ func (s *Servers) GetServer(dsn string) (*Server, error) {
 		if !ok {
 			server, err = NewServer(dsn, s.opts...)
 			if err != nil {
+				level.Error(logger).Log("msg", "failed create NewServer", "server", server, "err", err)
 				time.Sleep(time.Duration(errCount) * time.Second)
 				continue
 			}
@@ -182,9 +211,14 @@ func (s *Servers) GetServer(dsn string) (*Server, error) {
 func (s *Servers) Close() {
 	s.m.Lock()
 	defer s.m.Unlock()
+	if len(s.servers) == 0 {
+		level.Debug(logger).Log("msg", "no servers to close connection for")
+		return
+	}
 	for _, server := range s.servers {
+		level.Info(logger).Log("msg", "closing server", "server", server)
 		if err := server.Close(); err != nil {
-			level.Error(logger).Log("msg", "Failed to close connection", "server", server, "err", err)
+			level.Error(logger).Log("msg", "failed to close connection", "server", server, "err", err)
 		}
 	}
 }

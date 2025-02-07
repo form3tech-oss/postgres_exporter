@@ -420,6 +420,11 @@ type Exporter struct {
 	userQueriesError *prometheus.GaugeVec
 	totalScrapes     prometheus.Counter
 
+	// Connection settings
+	maxOpenConnections int
+	maxIdleConnections int
+	scrapeTimeout      time.Duration	
+
 	// servers are used to allow re-using the DB connection between scrapes.
 	// servers contains metrics map and query overrides.
 	servers *Servers
@@ -469,6 +474,24 @@ func IncludeDatabases(s string) ExporterOpt {
 func WithUserQueriesPath(p string) ExporterOpt {
 	return func(e *Exporter) {
 		e.userQueriesPath = p
+	}
+}
+
+func WithMaxOpenConnections(n int) ExporterOpt {
+	return func(e *Exporter) {
+		e.maxOpenConnections = n
+	}
+}
+
+func WithMaxIdleConnections(n int) ExporterOpt {
+	return func(e *Exporter) {
+		e.maxIdleConnections = n
+	}
+}
+
+func WithScrapeTimeout(d time.Duration) ExporterOpt {
+	return func(e *Exporter) {
+		e.scrapeTimeout = d
 	}
 }
 

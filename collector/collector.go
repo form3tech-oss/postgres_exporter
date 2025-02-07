@@ -40,6 +40,9 @@ const (
 
 	defaultEnabled  = true
 	defaultDisabled = false
+
+	defaultMaxOpenConnections = 10
+	defaultIdleConnections    = 5
 )
 
 var (
@@ -92,8 +95,11 @@ type PostgresCollector struct {
 	Collectors map[string]Collector
 	logger     log.Logger
 
-	instance *instance
-	constantLabels prometheus.Labels
+	instance           *instance
+	constantLabels     prometheus.Labels
+	maxOpenConnections int
+	maxIdleConnections int
+	scrapeTimeout      time.Duration
 }
 
 type Option func(*PostgresCollector) error
@@ -106,10 +112,37 @@ func WithConstantLabels(l prometheus.Labels) Option {
 	}
 }
 
+// WithMaxOpenConnections configures the max number of open connections kept in the underlying pool.
+func WithMaxOpenConnections(v int) Option {
+	return func(c *PostgresCollector) error {
+		c.maxOpenConnections = v
+		return nil
+	}
+}
+
+// WithMaxIdleConnections configures the max number of idle connections kept in the underlying pool.
+func WithMaxIdleConnections(v int) Option {
+	return func(c *PostgresCollector) error {
+		c.maxIdleConnections = v
+		return nil
+	}
+}
+
+// WithScrapeTimeout configures the timeout for a single collector scrape.
+func WithScrapeTimeout(t time.Duration) Option {
+	return func(c *PostgresCollector) error {
+		c.scrapeTimeout = t
+		return nil
+	}
+}
+
 // NewPostgresCollector creates a new PostgresCollector.
 func NewPostgresCollector(logger log.Logger, excludeDatabases []string, dsn string, filters []string, options ...Option) (*PostgresCollector, error) {
 	p := &PostgresCollector{
-		logger: logger,
+		logger:             logger,
+		scrapeTimeout:      5 * time.Second,
+		maxOpenConnections: defaultMaxOpenConnections,
+		maxIdleConnections: defaultIdleConnections,
 	}
 	// Apply options to customize the collector
 	for _, o := range options {
@@ -160,13 +193,29 @@ func NewPostgresCollector(logger log.Logger, excludeDatabases []string, dsn stri
 		return nil, errors.New("empty dsn")
 	}
 
-	instance, err := newInstance(dsn)
+	instanceConf := &instanceConfiguration{
+		dbMaxOpenConns: p.maxOpenConnections,
+		dbMaxIdleConns: p.maxIdleConnections,
+	}
+	instance, err := newInstance(dsn, instanceConf)
 	if err != nil {
+		return nil, err
+	}
+
+	err = instance.setup()
+	if err != nil {
+		level.Error(p.logger).Log("msg", "setting up connection to database", "err", err)
 		return nil, err
 	}
 	p.instance = instance
 
 	return p, nil
+}
+
+// Close closes the underlying collector instance
+func (p PostgresCollector) Close() error {
+	level.Debug(p.logger).Log("msg", "closing collector", "instance", p.instance)
+	return p.instance.Close()
 }
 
 // Describe implements the prometheus.Collector interface.
@@ -177,42 +226,40 @@ func (p PostgresCollector) Describe(ch chan<- *prometheus.Desc) {
 
 // Collect implements the prometheus.Collector interface.
 func (p PostgresCollector) Collect(ch chan<- prometheus.Metric) {
-	ctx := context.TODO()
-
-	// Set up the database connection for the collector.
-	err := p.instance.setup()
-	if err != nil {
-		level.Error(p.logger).Log("msg", "Error opening connection to database", "err", err)
-		return
-	}
-	defer p.instance.Close()
+	ctx := context.Background()
 
 	wg := sync.WaitGroup{}
 	wg.Add(len(p.Collectors))
 	for name, c := range p.Collectors {
 		go func(name string, c Collector) {
-			execute(ctx, name, c, p.instance, ch, p.logger)
-			wg.Done()
+			execute(ctx, p.scrapeTimeout, name, c, p.instance, ch, p.logger, &wg)
 		}(name, c)
 	}
 	wg.Wait()
 }
 
-func execute(ctx context.Context, name string, c Collector, instance *instance, ch chan<- prometheus.Metric, logger log.Logger) {
+func execute(ctx context.Context, timeout time.Duration, name string, c Collector, instance *instance, ch chan<- prometheus.Metric, logger log.Logger, wg *sync.WaitGroup) {
+	defer wg.Done()
 	begin := time.Now()
-	err := c.Update(ctx, instance, ch)
+
+	scrapeCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	err := c.Update(scrapeCtx, instance, ch)
 	duration := time.Since(begin)
 	var success float64
 
 	if err != nil {
+		success = 0
 		if IsNoDataError(err) {
 			level.Debug(logger).Log("msg", "collector returned no data", "name", name, "duration_seconds", duration.Seconds(), "err", err)
+		} else if scrapeCtx.Err() == context.DeadlineExceeded {
+			level.Error(logger).Log("msg", "collector timedout", "name", name, "duration_seconds", duration.Seconds(), "err", err)
 		} else {
 			level.Error(logger).Log("msg", "collector failed", "name", name, "duration_seconds", duration.Seconds(), "err", err)
 		}
-		success = 0
 	} else {
-		level.Debug(logger).Log("msg", "collector succeeded", "name", name, "duration_seconds", duration.Seconds())
+		level.Info(logger).Log("msg", "collector succeeded", "name", name, "duration_seconds", duration.Seconds())
 		success = 1
 	}
 	ch <- prometheus.MustNewConstMetric(scrapeDurationDesc, prometheus.GaugeValue, duration.Seconds(), name)

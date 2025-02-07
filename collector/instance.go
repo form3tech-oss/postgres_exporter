@@ -25,11 +25,18 @@ type instance struct {
 	dsn     string
 	db      *sql.DB
 	version semver.Version
+	conf    *instanceConfiguration
 }
 
-func newInstance(dsn string) (*instance, error) {
+type instanceConfiguration struct {
+	dbMaxOpenConns int
+	dbMaxIdleConns int
+}
+
+func newInstance(dsn string, conf *instanceConfiguration) (*instance, error) {
 	i := &instance{
-		dsn: dsn,
+		dsn:  dsn,
+		conf: conf,
 	}
 
 	// "Create" a database handle to verify the DSN provided is valid.
@@ -48,16 +55,16 @@ func (i *instance) setup() error {
 	if err != nil {
 		return err
 	}
-	db.SetMaxOpenConns(1)
-	db.SetMaxIdleConns(1)
-	i.db = db
+	db.SetMaxOpenConns(i.conf.dbMaxOpenConns)
+	db.SetMaxIdleConns(i.conf.dbMaxIdleConns)
 
-	version, err := queryVersion(i.db)
+	version, err := queryVersion(db)
 	if err != nil {
 		return fmt.Errorf("error querying postgresql version: %w", err)
 	} else {
 		i.version = version
 	}
+	i.db = db
 	return nil
 }
 
