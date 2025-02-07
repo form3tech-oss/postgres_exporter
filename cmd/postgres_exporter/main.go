@@ -139,6 +139,7 @@ func main() {
 		IncludeDatabases(*includeDatabases),
 		WithMaxOpenConnections(*maxOpenConnections),
 		WithMaxIdleConnections(*maxIdleConnections),
+		WithScrapeTimeout(*collectorTimeout),
 	}
 
 	exporter := NewExporter(dsns, opts...)
