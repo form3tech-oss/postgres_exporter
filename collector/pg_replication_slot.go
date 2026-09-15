@@ -17,8 +17,8 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/go-kit/log"
 	"github.com/prometheus/client_golang/prometheus"
+	"log/slog"
 )
 
 const replicationSlotSubsystem = "replication_slot"
@@ -28,7 +28,7 @@ func init() {
 }
 
 type PGReplicationSlotCollector struct {
-	log                               log.Logger
+	log                               *slog.Logger
 	pgReplicationSlotCurrentWalDesc   *prometheus.Desc
 	pgReplicationSlotCurrentFlushDesc *prometheus.Desc
 	pgReplicationSlotIsActiveDesc     *prometheus.Desc
@@ -74,7 +74,7 @@ func NewPGReplicationSlotCollector(config collectorConfig) (Collector, error) {
 				"wal_status",
 			),
 			"availability of WAL files claimed by this slot",
-			[]string{"slot_name", "slot_type", "wal_status"}, 
+			[]string{"slot_name", "slot_type", "wal_status"},
 			config.constantLabels,
 		),
 	}, nil

@@ -18,10 +18,10 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/go-kit/log"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/smartystreets/goconvey/convey"
+	"log/slog"
 )
 
 var queryWithFlushedLSN = fmt.Sprintf(pgStatWalReceiverQueryTemplate, "(flushed_lsn - '0/0') % (2^52)::bigint as flushed_lsn,\n")
@@ -82,7 +82,7 @@ func TestPGStatWalReceiverCollectorWithFlushedLSN(t *testing.T) {
 	go func() {
 		defer close(ch)
 		c, _ := NewPGStatWalReceiverCollector(collectorConfig{
-			logger: log.NewNopLogger(),
+			logger:         slog.New(slog.DiscardHandler),
 			constantLabels: prometheus.Labels{},
 		})
 
@@ -162,7 +162,7 @@ func TestPGStatWalReceiverCollectorWithNoFlushedLSN(t *testing.T) {
 	go func() {
 		defer close(ch)
 		c, _ := NewPGStatWalReceiverCollector(collectorConfig{
-			logger: log.NewNopLogger(),
+			logger:         slog.New(slog.DiscardHandler),
 			constantLabels: prometheus.Labels{},
 		})
 

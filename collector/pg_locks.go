@@ -17,8 +17,8 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/go-kit/log"
 	"github.com/prometheus/client_golang/prometheus"
+	"log/slog"
 )
 
 const locksSubsystem = "locks"
@@ -28,29 +28,27 @@ func init() {
 }
 
 type PGLocksCollector struct {
-	log log.Logger
+	log         *slog.Logger
 	pgLocksDesc *prometheus.Desc
 }
 
 func NewPGLocksCollector(config collectorConfig) (Collector, error) {
 	return &PGLocksCollector{
 		log: config.logger,
-		pgLocksDesc : prometheus.NewDesc(
+		pgLocksDesc: prometheus.NewDesc(
 			prometheus.BuildFQName(
 				namespace,
 				locksSubsystem,
 				"count",
 			),
 			"Number of locks",
-			[]string{"datname", "mode"}, 
+			[]string{"datname", "mode"},
 			config.constantLabels,
 		),
 	}, nil
 }
 
 var (
-	
-
 	pgLocksQuery = `
 		SELECT 
 		  pg_database.datname as datname,

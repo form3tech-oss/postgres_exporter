@@ -18,8 +18,8 @@ import (
 	"database/sql"
 
 	"github.com/blang/semver/v4"
-	"github.com/go-kit/log"
 	"github.com/prometheus/client_golang/prometheus"
+	"log/slog"
 )
 
 const statStatementsSubsystem = "stat_statements"
@@ -32,7 +32,7 @@ func init() {
 }
 
 type PGStatStatementsCollector struct {
-	log                                  log.Logger
+	log                                  *slog.Logger
 	statStatementsCallsTotal             *prometheus.Desc
 	statStatementsSecondsTotal           *prometheus.Desc
 	statStatementsRowsTotal              *prometheus.Desc

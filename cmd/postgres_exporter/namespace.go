@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/blang/semver/v4"
-	"github.com/go-kit/log/level"
 	"github.com/lib/pq"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -191,10 +190,10 @@ func queryNamespaceMappings(ctx context.Context, ch chan<- prometheus.Metric, se
 	scrapeStart := time.Now()
 
 	for namespace, mapping := range server.metricMap {
-		level.Debug(logger).Log("msg", "querying namespace", "namespace", namespace)
+		logger.Debug("querying namespace", "namespace", namespace)
 
 		if mapping.master && !server.master {
-			level.Debug(logger).Log("msg", "query skipped...", "namespace", namespace)
+			logger.Debug("query skipped...", "namespace", namespace)
 			continue
 		}
 
@@ -203,7 +202,7 @@ func queryNamespaceMappings(ctx context.Context, ch chan<- prometheus.Metric, se
 			serVersion, _ := semver.Parse(server.lastMapVersion.String())
 			runServerRange, _ := semver.ParseRange(server.runonserver)
 			if !runServerRange(serVersion) {
-				level.Debug(logger).Log("msg", "query skipped for this database version", "version", server.lastMapVersion.String(), "target_version", server.runonserver)
+				logger.Debug("query skipped for this database version", "version", server.lastMapVersion.String(), "target_version", server.runonserver)
 				continue
 			}
 		}
@@ -227,20 +226,20 @@ func queryNamespaceMappings(ctx context.Context, ch chan<- prometheus.Metric, se
 		var err error
 		if scrapeMetric {
 			metrics, nonFatalErrors, err = queryNamespaceMappingWithContext(ctx, server, namespace, mapping)
-			} else {
-			level.Debug(logger).Log("msg", "found cached metrics", "namespace", namespace)
+		} else {
+			logger.Debug("found cached metrics", "namespace", namespace)
 			metrics = cachedMetric.metrics
 		}
 
 		// Serious error - a namespace disappeared
 		if err != nil {
 			namespaceErrors[namespace] = err
-			level.Error(logger).Log("err", err)
+			logger.Error("namespace query failed", "err", err)
 		}
 		// Non-serious errors - likely version or parsing problems.
 		if len(nonFatalErrors) > 0 {
 			for _, err := range nonFatalErrors {
-				level.Error(logger).Log("err", err)
+				logger.Error("namespace query failed", "err", err)
 			}
 		}
 

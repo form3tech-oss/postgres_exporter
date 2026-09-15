@@ -18,10 +18,10 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/go-kit/log"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/smartystreets/goconvey/convey"
+	"log/slog"
 )
 
 func TestPGStatDatabaseCollector(t *testing.T) {
@@ -88,7 +88,7 @@ func TestPGStatDatabaseCollector(t *testing.T) {
 	go func() {
 		defer close(ch)
 		c, _ := NewPGStatDatabaseCollector(collectorConfig{
-			logger:         log.NewNopLogger(),
+			logger:         slog.New(slog.DiscardHandler),
 			constantLabels: prometheus.Labels{},
 		})
 
@@ -210,7 +210,7 @@ func TestPGStatDatabaseCollectorNullValues(t *testing.T) {
 	go func() {
 		defer close(ch)
 		c, _ := NewPGStatDatabaseCollector(collectorConfig{
-			logger:         log.With(log.NewNopLogger(), "collector", "pg_stat_database"),
+			logger:         slog.New(slog.DiscardHandler).With("collector", "pg_stat_database"),
 			constantLabels: prometheus.Labels{},
 		})
 
@@ -353,7 +353,7 @@ func TestPGStatDatabaseCollectorRowLeakTest(t *testing.T) {
 	go func() {
 		defer close(ch)
 		c, _ := NewPGStatDatabaseCollector(collectorConfig{
-			logger:         log.With(log.NewNopLogger(), "collector", "pg_stat_database"),
+			logger:         slog.New(slog.DiscardHandler).With("collector", "pg_stat_database"),
 			constantLabels: prometheus.Labels{},
 		})
 
@@ -470,7 +470,7 @@ func TestPGStatDatabaseCollectorTestNilStatReset(t *testing.T) {
 	go func() {
 		defer close(ch)
 		c, _ := NewPGStatDatabaseCollector(collectorConfig{
-			logger:         log.With(log.NewNopLogger(), "collector", "pg_stat_database"),
+			logger:         slog.New(slog.DiscardHandler).With("collector", "pg_stat_database"),
 			constantLabels: prometheus.Labels{},
 		})
 

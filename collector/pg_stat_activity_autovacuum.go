@@ -16,8 +16,8 @@ package collector
 import (
 	"context"
 
-	"github.com/go-kit/log"
 	"github.com/prometheus/client_golang/prometheus"
+	"log/slog"
 )
 
 const statActivityAutovacuumSubsystem = "stat_activity_autovacuum"
@@ -27,7 +27,7 @@ func init() {
 }
 
 type PGStatActivityAutovacuumCollector struct {
-	log                                log.Logger
+	log                                *slog.Logger
 	statActivityAutovacuumAgeInSeconds *prometheus.Desc
 }
 

@@ -17,9 +17,9 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/go-kit/log"
 	"github.com/lib/pq"
 	"github.com/prometheus/client_golang/prometheus"
+	"log/slog"
 )
 
 func init() {
@@ -28,7 +28,7 @@ func init() {
 }
 
 type PGProcessIdleCollector struct {
-	log                  log.Logger
+	log                  *slog.Logger
 	pgProcessIdleSeconds *prometheus.Desc
 }
 

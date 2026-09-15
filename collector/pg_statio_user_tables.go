@@ -17,8 +17,8 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/go-kit/log"
 	"github.com/prometheus/client_golang/prometheus"
+	"log/slog"
 )
 
 const statioUserTableSubsystem = "statio_user_tables"
@@ -28,7 +28,7 @@ func init() {
 }
 
 type PGStatIOUserTablesCollector struct {
-	log                           log.Logger
+	log                           *slog.Logger
 	statioUserTablesHeapBlksRead  *prometheus.Desc
 	statioUserTablesHeapBlksHit   *prometheus.Desc
 	statioUserTablesIdxBlksRead   *prometheus.Desc

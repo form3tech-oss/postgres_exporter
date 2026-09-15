@@ -17,8 +17,8 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/go-kit/log"
 	"github.com/prometheus/client_golang/prometheus"
+	"log/slog"
 )
 
 const statStatementsSummarySubsystem = "stat_statements_summary"
@@ -28,7 +28,7 @@ func init() {
 }
 
 type PGStatStatementsSummaryCollector struct {
-	log                               log.Logger
+	log                               *slog.Logger
 	statStatementsSummaryCallsTotal   *prometheus.Desc
 	statStatementsSummarySecondsTotal *prometheus.Desc
 }

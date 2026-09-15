@@ -17,8 +17,8 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/go-kit/log"
 	"github.com/prometheus/client_golang/prometheus"
+	"log/slog"
 )
 
 const rolesSubsystem = "roles"
@@ -28,7 +28,7 @@ func init() {
 }
 
 type PGRolesCollector struct {
-	log log.Logger
+	log                         *slog.Logger
 	pgRolesConnectionLimitsDesc *prometheus.Desc
 }
 

@@ -17,8 +17,8 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/go-kit/log"
 	"github.com/prometheus/client_golang/prometheus"
+	"log/slog"
 )
 
 const databaseSubsystem = "database"
@@ -28,9 +28,9 @@ func init() {
 }
 
 type PGDatabaseCollector struct {
-	log               log.Logger
-	excludedDatabases []string
-	pgDatabaseSizeDesc *prometheus.Desc
+	log                            *slog.Logger
+	excludedDatabases              []string
+	pgDatabaseSizeDesc             *prometheus.Desc
 	pgDatabaseConnectionLimitsDesc *prometheus.Desc
 }
 
