@@ -17,10 +17,10 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/go-kit/log"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/smartystreets/goconvey/convey"
+	"log/slog"
 )
 
 func TestPgWALCollector(t *testing.T) {
@@ -41,7 +41,7 @@ func TestPgWALCollector(t *testing.T) {
 	go func() {
 		defer close(ch)
 		c, _ := NewPGWALCollector(collectorConfig{
-			logger: log.NewNopLogger(),
+			logger:         slog.New(slog.DiscardHandler),
 			constantLabels: prometheus.Labels{},
 		})
 

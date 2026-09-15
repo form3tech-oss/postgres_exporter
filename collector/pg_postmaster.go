@@ -32,22 +32,20 @@ type PGPostmasterCollector struct {
 
 func NewPGPostmasterCollector(config collectorConfig) (Collector, error) {
 	return &PGPostmasterCollector{
-		pgPostMasterStartTimeSeconds : prometheus.NewDesc(
+		pgPostMasterStartTimeSeconds: prometheus.NewDesc(
 			prometheus.BuildFQName(
 				namespace,
 				postmasterSubsystem,
 				"start_time_seconds",
 			),
 			"Time at which postmaster started",
-			[]string{}, 
+			[]string{},
 			config.constantLabels,
 		),
 	}, nil
 }
 
 var (
-	
-
 	pgPostmasterQuery = "SELECT extract(epoch from pg_postmaster_start_time) from pg_postmaster_start_time();"
 )
 

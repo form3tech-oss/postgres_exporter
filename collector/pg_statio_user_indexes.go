@@ -16,8 +16,8 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/go-kit/log"
 	"github.com/prometheus/client_golang/prometheus"
+	"log/slog"
 )
 
 func init() {
@@ -25,7 +25,7 @@ func init() {
 }
 
 type PGStatioUserIndexesCollector struct {
-	log                          log.Logger
+	log                          *slog.Logger
 	statioUserIndexesIdxBlksRead *prometheus.Desc
 	statioUserIndexesIdxBlksHit  *prometheus.Desc
 }
@@ -59,6 +59,7 @@ var statioUserIndexesQuery = `
 		idx_blks_hit
 	FROM pg_statio_user_indexes
 	`
+
 func (c *PGStatioUserIndexesCollector) Update(ctx context.Context, instance *instance, ch chan<- prometheus.Metric) error {
 	db := instance.getDB()
 	rows, err := db.QueryContext(ctx,

@@ -21,9 +21,8 @@ import (
 	"time"
 
 	"github.com/alecthomas/kingpin/v2"
-	"github.com/go-kit/log"
-	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
+	"log/slog"
 )
 
 var (
@@ -65,7 +64,7 @@ type Collector interface {
 }
 
 type collectorConfig struct {
-	logger           log.Logger
+	logger           *slog.Logger
 	excludeDatabases []string
 	constantLabels   prometheus.Labels
 }
@@ -93,7 +92,7 @@ func registerCollector(name string, isDefaultEnabled bool, createFunc func(colle
 // PostgresCollector implements the prometheus.Collector interface.
 type PostgresCollector struct {
 	Collectors map[string]Collector
-	logger     log.Logger
+	logger     *slog.Logger
 
 	instance           *instance
 	constantLabels     prometheus.Labels
@@ -137,7 +136,7 @@ func WithScrapeTimeout(t time.Duration) Option {
 }
 
 // NewPostgresCollector creates a new PostgresCollector.
-func NewPostgresCollector(logger log.Logger, excludeDatabases []string, dsn string, filters []string, options ...Option) (*PostgresCollector, error) {
+func NewPostgresCollector(logger *slog.Logger, excludeDatabases []string, dsn string, filters []string, options ...Option) (*PostgresCollector, error) {
 	p := &PostgresCollector{
 		logger:             logger,
 		scrapeTimeout:      5 * time.Second,
@@ -167,7 +166,7 @@ func NewPostgresCollector(logger log.Logger, excludeDatabases []string, dsn stri
 	initiatedCollectorsMtx.Lock()
 	defer initiatedCollectorsMtx.Unlock()
 	for key, enabled := range collectorState {
-		level.Debug(logger).Log("msg", "collector state", "name", key, "enabled", enabled)
+		logger.Debug("collector state", "name", key, "enabled", enabled)
 		if !*enabled || (len(f) > 0 && !f[key]) {
 			continue
 		}
@@ -175,7 +174,7 @@ func NewPostgresCollector(logger log.Logger, excludeDatabases []string, dsn stri
 			collectors[key] = collector
 		} else {
 			collector, err := factories[key](collectorConfig{
-				logger:           log.With(logger, "collector", key),
+				logger:           logger.With("collector", key),
 				excludeDatabases: excludeDatabases,
 				constantLabels:   p.constantLabels,
 			})
@@ -204,7 +203,7 @@ func NewPostgresCollector(logger log.Logger, excludeDatabases []string, dsn stri
 
 	err = instance.setup()
 	if err != nil {
-		level.Error(p.logger).Log("msg", "setting up connection to database", "err", err)
+		p.logger.Error("setting up connection to database", "err", err)
 		return nil, err
 	}
 	p.instance = instance
@@ -214,7 +213,7 @@ func NewPostgresCollector(logger log.Logger, excludeDatabases []string, dsn stri
 
 // Close closes the underlying collector instance
 func (p PostgresCollector) Close() error {
-	level.Debug(p.logger).Log("msg", "closing collector", "instance", p.instance)
+	p.logger.Debug("closing collector", "instance", p.instance)
 	return p.instance.Close()
 }
 
@@ -238,7 +237,7 @@ func (p PostgresCollector) Collect(ch chan<- prometheus.Metric) {
 	wg.Wait()
 }
 
-func execute(ctx context.Context, timeout time.Duration, name string, c Collector, instance *instance, ch chan<- prometheus.Metric, logger log.Logger, wg *sync.WaitGroup) {
+func execute(ctx context.Context, timeout time.Duration, name string, c Collector, instance *instance, ch chan<- prometheus.Metric, logger *slog.Logger, wg *sync.WaitGroup) {
 	defer wg.Done()
 	begin := time.Now()
 
@@ -252,14 +251,14 @@ func execute(ctx context.Context, timeout time.Duration, name string, c Collecto
 	if err != nil {
 		success = 0
 		if IsNoDataError(err) {
-			level.Debug(logger).Log("msg", "collector returned no data", "name", name, "duration_seconds", duration.Seconds(), "err", err)
+			logger.Debug("collector returned no data", "name", name, "duration_seconds", duration.Seconds(), "err", err)
 		} else if scrapeCtx.Err() == context.DeadlineExceeded {
-			level.Error(logger).Log("msg", "collector timedout", "name", name, "duration_seconds", duration.Seconds(), "err", err)
+			logger.Error("collector timedout", "name", name, "duration_seconds", duration.Seconds(), "err", err)
 		} else {
-			level.Error(logger).Log("msg", "collector failed", "name", name, "duration_seconds", duration.Seconds(), "err", err)
+			logger.Error("collector failed", "name", name, "duration_seconds", duration.Seconds(), "err", err)
 		}
 	} else {
-		level.Info(logger).Log("msg", "collector succeeded", "name", name, "duration_seconds", duration.Seconds())
+		logger.Info("collector succeeded", "name", name, "duration_seconds", duration.Seconds())
 		success = 1
 	}
 	ch <- prometheus.MustNewConstMetric(scrapeDurationDesc, prometheus.GaugeValue, duration.Seconds(), name)

@@ -17,9 +17,8 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/go-kit/log"
-	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
+	"log/slog"
 )
 
 func init() {
@@ -27,7 +26,7 @@ func init() {
 }
 
 type PGStatWalReceiverCollector struct {
-	log                               log.Logger
+	log                               *slog.Logger
 	statWalReceiverReceiveStartLsn    *prometheus.Desc
 	statWalReceiverReceiveStartTli    *prometheus.Desc
 	statWalReceiverFlushedLSN         *prometheus.Desc
@@ -167,55 +166,55 @@ func (c *PGStatWalReceiverCollector) Update(ctx context.Context, instance *insta
 			}
 		}
 		if !upstreamHost.Valid {
-			level.Debug(c.log).Log("msg", "Skipping wal receiver stats because upstream host is null")
+			c.log.Debug("Skipping wal receiver stats because upstream host is null")
 			continue
 		}
 
 		if !slotName.Valid {
-			level.Debug(c.log).Log("msg", "Skipping wal receiver stats because slotname host is null")
+			c.log.Debug("Skipping wal receiver stats because slotname host is null")
 			continue
 		}
 
 		if !status.Valid {
-			level.Debug(c.log).Log("msg", "Skipping wal receiver stats because status is null")
+			c.log.Debug("Skipping wal receiver stats because status is null")
 			continue
 		}
 		labels := []string{upstreamHost.String, slotName.String, status.String}
 
 		if !receiveStartLsn.Valid {
-			level.Debug(c.log).Log("msg", "Skipping wal receiver stats because receive_start_lsn is null")
+			c.log.Debug("Skipping wal receiver stats because receive_start_lsn is null")
 			continue
 		}
 		if !receiveStartTli.Valid {
-			level.Debug(c.log).Log("msg", "Skipping wal receiver stats because receive_start_tli is null")
+			c.log.Debug("Skipping wal receiver stats because receive_start_tli is null")
 			continue
 		}
 		if hasFlushedLSN && !flushedLsn.Valid {
-			level.Debug(c.log).Log("msg", "Skipping wal receiver stats because flushed_lsn is null")
+			c.log.Debug("Skipping wal receiver stats because flushed_lsn is null")
 			continue
 		}
 		if !receivedTli.Valid {
-			level.Debug(c.log).Log("msg", "Skipping wal receiver stats because received_tli is null")
+			c.log.Debug("Skipping wal receiver stats because received_tli is null")
 			continue
 		}
 		if !lastMsgSendTime.Valid {
-			level.Debug(c.log).Log("msg", "Skipping wal receiver stats because last_msg_send_time is null")
+			c.log.Debug("Skipping wal receiver stats because last_msg_send_time is null")
 			continue
 		}
 		if !lastMsgReceiptTime.Valid {
-			level.Debug(c.log).Log("msg", "Skipping wal receiver stats because last_msg_receipt_time is null")
+			c.log.Debug("Skipping wal receiver stats because last_msg_receipt_time is null")
 			continue
 		}
 		if !latestEndLsn.Valid {
-			level.Debug(c.log).Log("msg", "Skipping wal receiver stats because latest_end_lsn is null")
+			c.log.Debug("Skipping wal receiver stats because latest_end_lsn is null")
 			continue
 		}
 		if !latestEndTime.Valid {
-			level.Debug(c.log).Log("msg", "Skipping wal receiver stats because latest_end_time is null")
+			c.log.Debug("Skipping wal receiver stats because latest_end_time is null")
 			continue
 		}
 		if !upstreamNode.Valid {
-			level.Debug(c.log).Log("msg", "Skipping wal receiver stats because upstream_node is null")
+			c.log.Debug("Skipping wal receiver stats because upstream_node is null")
 			continue
 		}
 		ch <- prometheus.MustNewConstMetric(

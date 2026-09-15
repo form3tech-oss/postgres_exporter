@@ -25,15 +25,16 @@ import (
 	"syscall"
 	"time"
 
+	"log/slog"
+
 	"github.com/alecthomas/kingpin/v2"
 	"github.com/form3tech-oss/postgres_exporter/collector"
 	"github.com/form3tech-oss/postgres_exporter/config"
-	"github.com/go-kit/log"
-	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
+	versioncollector "github.com/prometheus/client_golang/prometheus/collectors/version"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/prometheus/common/promlog"
-	"github.com/prometheus/common/promlog/flag"
+	"github.com/prometheus/common/promslog"
+	"github.com/prometheus/common/promslog/flag"
 	"github.com/prometheus/common/version"
 	"github.com/prometheus/exporter-toolkit/web"
 	"github.com/prometheus/exporter-toolkit/web/kingpinflag"
@@ -60,7 +61,7 @@ var (
 	maxOpenConnections     = kingpin.Flag("max-connections", "the maximum number of opened connections").Default("10").Envar("PG_MAX_CONNECTIONS").Int()
 	maxIdleConnections     = kingpin.Flag("max-idle-connections", "the maximum number of idle connections").Default("5").Envar("PG_MAX_IDLE_CONNECTIONS").Int()
 	collectorTimeout       = kingpin.Flag("collector-timeout", "the single collector scrape timeout").Default("10s").Envar("PG_COLLECTOR_TIMEOUT").Duration()
-	logger                 = log.NewNopLogger()
+	logger                 = slog.New(slog.DiscardHandler)
 )
 
 // Metric name parts.
@@ -80,11 +81,11 @@ const (
 
 func main() {
 	kingpin.Version(version.Print(exporterName))
-	promlogConfig := &promlog.Config{}
-	flag.AddFlags(kingpin.CommandLine, promlogConfig)
+	promslogConfig := &promslog.Config{}
+	flag.AddFlags(kingpin.CommandLine, promslogConfig)
 	kingpin.HelpFlag.Short('h')
 	kingpin.Parse()
-	logger = promlog.New(promlogConfig)
+	logger = promslog.New(promslogConfig)
 
 	if *onlyDumpMaps {
 		dumpMaps()
@@ -94,10 +95,10 @@ func main() {
 	if *onlyHealthCheck {
 		healthy, err := runHealthCheck(webConfig)
 		if err != nil {
-			level.Error(logger).Log("msg", "error running health check", "err", err)
+			logger.Error("error running health check", "err", err)
 		}
 		if healthy {
-			level.Info(logger).Log("msg", "health ok")
+			logger.Info("health ok")
 			os.Exit(0)
 		}
 		os.Exit(1)
@@ -105,28 +106,28 @@ func main() {
 
 	if err := c.ReloadConfig(*configFile, logger); err != nil {
 		// This is not fatal, but it means that auth must be provided for every dsn.
-		level.Warn(logger).Log("msg", "Error loading config", "err", err)
+		logger.Warn("Error loading config", "err", err)
 	}
 
 	dsns, err := getDataSources()
 	if err != nil {
-		level.Error(logger).Log("msg", "Failed reading data sources", "err", err.Error())
+		logger.Error("Failed reading data sources", "err", err.Error())
 		os.Exit(1)
 	}
 
 	excludedDatabases := strings.Split(*excludeDatabases, ",")
-	level.Info(logger).Log("msg", "Excluded databases", "databases", fmt.Sprintf("%v", excludedDatabases))
+	logger.Info("Excluded databases", "databases", fmt.Sprintf("%v", excludedDatabases))
 
 	if *queriesPath != "" {
-		level.Warn(logger).Log("msg", "The extended queries.yaml config is DEPRECATED", "file", *queriesPath)
+		logger.Warn("The extended queries.yaml config is DEPRECATED", "file", *queriesPath)
 	}
 
 	if *autoDiscoverDatabases || *excludeDatabases != "" || *includeDatabases != "" {
-		level.Warn(logger).Log("msg", "Scraping additional databases via auto discovery is DEPRECATED")
+		logger.Warn("Scraping additional databases via auto discovery is DEPRECATED")
 	}
 
 	if *constantLabelsList != "" {
-		level.Warn(logger).Log("msg", "Constant labels on all metrics is DEPRECATED")
+		logger.Warn("Constant labels on all metrics is DEPRECATED")
 	}
 
 	opts := []ExporterOpt{
@@ -147,7 +148,7 @@ func main() {
 	reg := prometheus.NewRegistry()
 
 	reg.MustRegister(
-		version.NewCollector(exporterName),
+		versioncollector.NewCollector(exporterName),
 		exporter,
 	)
 
@@ -179,7 +180,7 @@ func main() {
 		collOpts...,
 	)
 	if err != nil {
-		level.Error(logger).Log("msg", "Failed to create PostgresCollector", "err", err.Error())
+		logger.Error("Failed to create PostgresCollector", "err", err.Error())
 	} else {
 		reg.MustRegister(pgColl)
 	}
@@ -200,7 +201,7 @@ func main() {
 		}
 		landingPage, err := web.NewLandingPage(landingConfig)
 		if err != nil {
-			level.Error(logger).Log("err", err)
+			logger.Error("error creating landing page", "err", err)
 			os.Exit(1)
 		}
 		http.Handle("/", landingPage)
@@ -208,14 +209,14 @@ func main() {
 
 	srv := &http.Server{}
 	srv.RegisterOnShutdown(func() {
-		level.Info(logger).Log("msg", "gracefully shutting down HTTP server")
+		logger.Info("gracefully shutting down HTTP server")
 		exporter.servers.Close()
 		pgColl.Close()
 	})
 
 	go func() {
 		if err := web.ListenAndServe(srv, webConfig, logger); !errors.Is(err, http.ErrServerClosed) {
-			level.Error(logger).Log("msg", "running HTTP server", "err", err)
+			logger.Error("running HTTP server", "err", err)
 		}
 	}()
 
@@ -226,10 +227,10 @@ func main() {
 	shutdownCtx, shutdownRelease := context.WithTimeout(context.Background(), 30*time.Second)
 	defer shutdownRelease()
 	if err := srv.Shutdown(shutdownCtx); err != nil {
-		level.Error(logger).Log("msg", "during HTTP server shut down", "err", err)
+		logger.Error("during HTTP server shut down", "err", err)
 		os.Exit(1)
 	}
-	level.Info(logger).Log("msg", "HTTP server gracefully shut down")
+	logger.Info("HTTP server gracefully shut down")
 }
 
 func runHealthCheck(webConfig *web.FlagConfig) (bool, error) {

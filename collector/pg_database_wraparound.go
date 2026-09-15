@@ -17,9 +17,8 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/go-kit/log"
-	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
+	"log/slog"
 )
 
 const databaseWraparoundSubsystem = "database_wraparound"
@@ -29,7 +28,7 @@ func init() {
 }
 
 type PGDatabaseWraparoundCollector struct {
-	log                               log.Logger
+	log                               *slog.Logger
 	databaseWraparoundAgeDatfrozenxid *prometheus.Desc
 	databaseWraparoundAgeDatminmxid   *prometheus.Desc
 }
@@ -84,15 +83,15 @@ func (c *PGDatabaseWraparoundCollector) Update(ctx context.Context, instance *in
 		}
 
 		if !datname.Valid {
-			level.Debug(c.log).Log("msg", "Skipping database with NULL name")
+			c.log.Debug("Skipping database with NULL name")
 			continue
 		}
 		if !ageDatfrozenxid.Valid {
-			level.Debug(c.log).Log("msg", "Skipping stat emission with NULL age_datfrozenxid")
+			c.log.Debug("Skipping stat emission with NULL age_datfrozenxid")
 			continue
 		}
 		if !ageDatminmxid.Valid {
-			level.Debug(c.log).Log("msg", "Skipping stat emission with NULL age_datminmxid")
+			c.log.Debug("Skipping stat emission with NULL age_datminmxid")
 			continue
 		}
 

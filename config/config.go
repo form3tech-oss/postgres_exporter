@@ -18,10 +18,10 @@ import (
 	"os"
 	"sync"
 
-	"github.com/go-kit/log"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"gopkg.in/yaml.v3"
+	"log/slog"
 )
 
 var (
@@ -65,7 +65,7 @@ func (ch *Handler) GetConfig() *Config {
 	return ch.Config
 }
 
-func (ch *Handler) ReloadConfig(f string, logger log.Logger) error {
+func (ch *Handler) ReloadConfig(f string, logger *slog.Logger) error {
 	config := &Config{}
 	var err error
 	defer func() {

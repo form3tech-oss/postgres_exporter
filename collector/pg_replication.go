@@ -26,13 +26,13 @@ func init() {
 }
 
 type PGReplicationCollector struct {
-	pgReplicationLag *prometheus.Desc
+	pgReplicationLag       *prometheus.Desc
 	pgReplicationIsReplica *prometheus.Desc
 }
 
 func NewPGReplicationCollector(config collectorConfig) (Collector, error) {
 	return &PGReplicationCollector{
-		pgReplicationLag : prometheus.NewDesc(
+		pgReplicationLag: prometheus.NewDesc(
 			prometheus.BuildFQName(
 				namespace,
 				replicationSubsystem,
@@ -42,7 +42,7 @@ func NewPGReplicationCollector(config collectorConfig) (Collector, error) {
 			[]string{},
 			config.constantLabels,
 		),
-		pgReplicationIsReplica : prometheus.NewDesc(
+		pgReplicationIsReplica: prometheus.NewDesc(
 			prometheus.BuildFQName(
 				namespace,
 				replicationSubsystem,

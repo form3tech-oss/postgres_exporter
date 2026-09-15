@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/blang/semver/v4"
-	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -48,7 +47,7 @@ type Server struct {
 	// Connection settings and timeout
 	maxOpenConnections int
 	maxIdleConnections int
-	scrapeTimeout      time.Duration	
+	scrapeTimeout      time.Duration
 }
 
 // ServerOpt configures a server.
@@ -93,7 +92,7 @@ func NewServer(dsn string, opts ...ServerOpt) (*Server, error) {
 		return nil, err
 	}
 
-	level.Info(logger).Log("msg", "setting up new server", "fingerprint", fingerprint)
+	logger.Info("setting up new server", "fingerprint", fingerprint)
 
 	s := &Server{
 		db:     db,
@@ -123,7 +122,7 @@ func (s *Server) Close() error {
 func (s *Server) Ping() error {
 	if err := s.db.Ping(); err != nil {
 		if cerr := s.Close(); cerr != nil {
-			level.Error(logger).Log("msg", "Error while closing non-pinging DB connection", "server", s, "err", cerr)
+			logger.Error("Error while closing non-pinging DB connection", "server", s, "err", cerr)
 		}
 		return err
 	}
@@ -191,7 +190,7 @@ func (s *Servers) GetServer(dsn string) (*Server, error) {
 		if !ok {
 			server, err = NewServer(dsn, s.opts...)
 			if err != nil {
-				level.Error(logger).Log("msg", "failed create NewServer", "server", server, "err", err)
+				logger.Error("failed create NewServer", "server", server, "err", err)
 				time.Sleep(time.Duration(errCount) * time.Second)
 				continue
 			}
@@ -212,13 +211,13 @@ func (s *Servers) Close() {
 	s.m.Lock()
 	defer s.m.Unlock()
 	if len(s.servers) == 0 {
-		level.Debug(logger).Log("msg", "no servers to close connection for")
+		logger.Debug("no servers to close connection for")
 		return
 	}
 	for _, server := range s.servers {
-		level.Info(logger).Log("msg", "closing server", "server", server)
+		logger.Info("closing server", "server", server)
 		if err := server.Close(); err != nil {
-			level.Error(logger).Log("msg", "failed to close connection", "server", server, "err", err)
+			logger.Error("failed to close connection", "server", server, "err", err)
 		}
 	}
 }

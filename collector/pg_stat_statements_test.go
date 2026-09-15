@@ -18,10 +18,10 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/blang/semver/v4"
-	"github.com/go-kit/log"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/smartystreets/goconvey/convey"
+	"log/slog"
 )
 
 func TestPGStateStatementsCollector(t *testing.T) {
@@ -42,7 +42,7 @@ func TestPGStateStatementsCollector(t *testing.T) {
 	go func() {
 		defer close(ch)
 		c, _ := NewPGStatStatementsCollector(collectorConfig{
-			logger: log.NewNopLogger(),
+			logger:         slog.New(slog.DiscardHandler),
 			constantLabels: prometheus.Labels{},
 		})
 
@@ -88,7 +88,7 @@ func TestPGStateStatementsCollectorNull(t *testing.T) {
 	go func() {
 		defer close(ch)
 		c, _ := NewPGStatStatementsCollector(collectorConfig{
-			logger: log.NewNopLogger(),
+			logger:         slog.New(slog.DiscardHandler),
 			constantLabels: prometheus.Labels{},
 		})
 
@@ -134,7 +134,7 @@ func TestPGStateStatementsCollectorNewPG(t *testing.T) {
 	go func() {
 		defer close(ch)
 		c, _ := NewPGStatStatementsCollector(collectorConfig{
-			logger: log.NewNopLogger(),
+			logger:         slog.New(slog.DiscardHandler),
 			constantLabels: prometheus.Labels{},
 		})
 

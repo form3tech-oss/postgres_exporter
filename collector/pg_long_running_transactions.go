@@ -16,8 +16,8 @@ package collector
 import (
 	"context"
 
-	"github.com/go-kit/log"
 	"github.com/prometheus/client_golang/prometheus"
+	"log/slog"
 )
 
 const longRunningTransactionsSubsystem = "long_running_transactions"
@@ -27,21 +27,21 @@ func init() {
 }
 
 type PGLongRunningTransactionsCollector struct {
-	log log.Logger
-	longRunningTransactionsCount *prometheus.Desc
+	log                                 *slog.Logger
+	longRunningTransactionsCount        *prometheus.Desc
 	longRunningTransactionsAgeInSeconds *prometheus.Desc
 }
 
 func NewPGLongRunningTransactionsCollector(config collectorConfig) (Collector, error) {
 	return &PGLongRunningTransactionsCollector{
 		log: config.logger,
-		longRunningTransactionsCount : prometheus.NewDesc(
+		longRunningTransactionsCount: prometheus.NewDesc(
 			"pg_long_running_transactions",
 			"Current number of long running transactions",
 			[]string{},
 			config.constantLabels,
 		),
-		longRunningTransactionsAgeInSeconds : prometheus.NewDesc(
+		longRunningTransactionsAgeInSeconds: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, longRunningTransactionsSubsystem, "oldest_timestamp_seconds"),
 			"The current maximum transaction age in seconds",
 			[]string{},
