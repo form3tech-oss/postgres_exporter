@@ -1,5 +1,5 @@
 go:
-    version: 1.22
+    version: 1.26.9
 repository:
     path: github.com/form3tech-oss/postgres_exporter
 build:
