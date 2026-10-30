@@ -18,7 +18,7 @@ jobs:
       - name: Setup Golang
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: "1.26.10"
+          go-version-file: go.mod
       - name: Test
         run: make test
   build:
@@ -30,7 +30,7 @@ jobs:
       - name: Setup Golang
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: "1.26.10"
+          go-version-file: go.mod
       - name: Set version
         run: echo "${{ needs.calculate-tag.outputs.tag }}" | sed s/v//g > VERSION
       - name: Build
